@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Profile - EduRank</title>
+  <script>
+    document.documentElement.classList.add(localStorage.getItem("theme") === "light" ? "light" : "dark");
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .verify-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.68rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+      margin-left: 6px;
+      vertical-align: middle;
+      transition: all 0.4s ease;
+    }
+    .verify-badge.unverified {
+      background: rgba(100, 116, 139, 0.15);
+      color: #94a3b8;
+      border: 1px solid rgba(100, 116, 139, 0.25);
+    }
+    .verify-badge.verified {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .profile-sync-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      color: var(--text-light);
+      margin-top: 6px;
+      opacity: 0.7;
+    }
+    .pulse-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #34d399;
+      animation: pulse-anim 2s infinite;
+    }
+    @keyframes pulse-anim {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.8); }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <nav class="navbar container">
+      <a href="index.html?view=main#home" class="nav-logo" style="text-decoration:none;">
+        <i class="fa-solid fa-graduation-cap"></i>
+        <span>EduRank</span>
+      </a>
+      <button class="nav-icon-btn hamburger-btn" id="hamburgerBtn" onclick="toggleMobileMenu()">
+        <i class="fa-solid fa-bars"></i>
+      </button>
+      <div class="nav-menu" id="navMenu">
+        <a href="index.html?view=main#home" class="nav-link">Home</a>
+        <a href="index.html?view=main#materi" class="nav-link">Materi</a>
+        <a href="index.html?view=main#ranked" class="nav-link">Ranked</a>
+        <a href="leaderboard.html" class="nav-link">Leaderboard</a>
+        <a href="feedback.html" class="nav-link">Feedback</a>
+      </div>
+      <div class="nav-actions">
+        <button class="nav-icon-btn" id="darkModeBtn" onclick="toggleDarkMode()">
+          <i class="fa-solid fa-sun" id="darkModeIcon"></i>
+        </button>
+        <a href="profile.html" style="display:block;" class="profile-btn active-link">
+          <img src="https://i.pravatar.cc/100?img=12" alt="Profile" id="navProfileImg" />
+        </a>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+    <section class="profile-dashboard-section">
+      <div class="container">
+        <div class="profile-hero">
+          <div class="profile-hero-left">
+            <div class="profile-avatar-wrap">
+              <img src="https://i.pravatar.cc/100?img=12" alt="Profile" id="profileAvatar">
+              <span class="profile-level-chip" id="profileLevelChip">Lv. 1</span>
+            </div>
+            <div>
+              <span class="profile-kicker">Competitive Learner</span>
+              <h1 id="profileName"></h1>
+              <p id="profileUsername"></p>
+              <p class="profile-bio" id="profileBio"></p>
+              <div class="profile-sync-indicator">
+                <span class="pulse-dot"></span>
+                <span>Data diperbarui otomatis dari database Developer</span>
+              </div>
+              <div class="profile-meta-row" style="flex-wrap: wrap; gap: 10px 20px;">
+                <span><i class="fa-solid fa-flag"></i> <span id="profileCountry">-</span></span>
+                <span><i class="fa-solid fa-map-location-dot"></i> Provinsi: <span id="profileProvince">-</span><span id="badgeProvince" class="verify-badge unverified">⏳ Menunggu verifikasi</span></span>
+                <span><i class="fa-solid fa-city"></i> Kota: <span id="profileCity">-</span><span id="badgeCity" class="verify-badge unverified">⏳ Menunggu verifikasi</span></span>
+                <span><i class="fa-solid fa-school"></i> Sekolah: <span id="profileSchool">-</span><span id="badgeSchool" class="verify-badge unverified">⏳ Menunggu verifikasi</span></span>
+                <span><i class="fa-solid fa-layer-group"></i> Kelas: <span id="profileClass">-</span><span id="badgeClass" class="verify-badge unverified">⏳ Menunggu verifikasi</span></span>
+              </div>
+            </div>
+          </div>
+          <button class="primary-btn" type="button" onclick="openEditProfileModal()">
+            <i class="fa-solid fa-pen-to-square"></i> Edit Profile
+          </button>
+        </div>
+
+        <div class="profile-grid">
+          <div class="profile-card profile-level-card">
+            <div class="profile-card-head">
+              <div>
+                <span>Account Level</span>
+                <h3 id="accountLevel">Level 1</h3>
+              </div>
+              <i class="fa-solid fa-bolt"></i>
+            </div>
+            <div class="rank-info-progress">
+              <div class="rank-info-progress-fill" id="accountExpFill"></div>
+            </div>
+            <p id="accountExpText">0 / 120 EXP</p>
+          </div>
+
+          <div class="profile-card stat-card">
+            <span>Total ELO</span>
+            <strong id="profileTotalELO">0</strong>
+            <p>Akumulasi seluruh mapel</p>
+          </div>
+
+          <div class="profile-card stat-card">
+            <span>Total Match</span>
+            <strong id="profileMatches">0</strong>
+            <p>Ranked dan casual</p>
+          </div>
+
+          <div class="profile-card stat-card">
+            <span>Winrate</span>
+            <strong id="profileWinrate">0%</strong>
+            <p>Performa akun</p>
+          </div>
+        </div>
+
+        <div class="profile-content-grid">
+          <div class="profile-card">
+            <div class="profile-card-head">
+              <h3>Rank per Mapel</h3>
+              <i class="fa-solid fa-trophy"></i>
+            </div>
+            <div class="rank-subject-list" id="profileSubjectRanks"></div>
+          </div>
+
+          <div class="profile-card">
+            <div class="profile-card-head">
+              <h3>Achievement</h3>
+              <i class="fa-solid fa-award"></i>
+            </div>
+            <div class="achievement-grid">
+              <div class="achievement-item"><i class="fa-solid fa-fire"></i><span>Fast Learner</span></div>
+              <div class="achievement-item"><i class="fa-solid fa-brain"></i><span>Math Core</span></div>
+              <div class="achievement-item"><i class="fa-solid fa-shield-halved"></i><span>Clutch Answer</span></div>
+              <div class="achievement-item locked"><i class="fa-solid fa-lock"></i><span>Profesor Path</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-content">
+      <div class="footer-logo">
+        <i class="fa-solid fa-graduation-cap"></i>
+        <span>EduRank</span>
+      </div>
+      <p>© 2026 EduRank. All Rights Reserved.</p>
+    </div>
+  </footer>
+
+  <div class="modal-overlay" id="editProfileOverlay">
+    <div class="game-modal edit-profile-modal">
+      <div class="modal-header">
+        <h3>Edit Profile</h3>
+        <button class="modal-close" type="button" onclick="closeEditProfileModal()"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form class="edit-profile-form" id="editProfileForm">
+        <div class="edit-avatar-row">
+          <img src="https://i.pravatar.cc/100?img=12" id="editAvatarPreview" alt="Avatar">
+          <label class="secondary-btn" for="editAvatarInput"><i class="fa-solid fa-camera"></i> Ganti Foto</label>
+          <input type="file" id="editAvatarInput" accept="image/*" hidden>
+        </div>
+        <div class="form-group"><label>Nama</label><input id="editName" required></div>
+        <div class="form-group"><label>Bio</label><textarea id="editBio" rows="3"></textarea></div>
+        <div style="border-top: 1px solid var(--border); margin: 15px 0; padding-top: 15px;">
+          <small style="color: var(--text-light); display: block; margin-bottom: 10px; line-height: 1.4;">
+            <i class="fa-solid fa-circle-info"></i> Username, email, sekolah, kelas, dan lokasi hanya dapat disunting oleh Developer setelah verifikasi foto pendaftaran.
+          </small>
+          <div class="form-group"><label>Username (Read-Only)</label><input id="editUsername" disabled style="background: rgba(0,0,0,0.25); cursor: not-allowed; opacity: 0.6;"></div>
+          <div class="form-group"><label>Email (Read-Only)</label><input id="editEmail" type="email" disabled style="background: rgba(0,0,0,0.25); cursor: not-allowed; opacity: 0.6;"></div>
+          <div class="form-group"><label>Kewarganegaraan (Read-Only)</label><input id="editCountry" disabled style="background: rgba(0,0,0,0.25); cursor: not-allowed; opacity: 0.6;"></div>
+          <div class="form-group"><label>Kelas (Read-Only)</label><input id="editClass" disabled style="background: rgba(0,0,0,0.25); cursor: not-allowed; opacity: 0.6;"></div>
+          <div class="form-group"><label>Sekolah (Read-Only)</label><input id="editSchool" disabled style="background: rgba(0,0,0,0.25); cursor: not-allowed; opacity: 0.6;"></div>
+        </div>
+        <button class="primary-btn" type="submit">Simpan Profile</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="api-config.js"></script>
+  <script src="interaksi.js"></script>
+  <script>
+    async function fetchProfileData() {
+      const token = localStorage.getItem("edurank_token");
+      if(!token) return null;
+      try {
+        const res = await fetch(getApiUrl('/api/profile'), {
+          headers: { "Authorization": "Bearer " + token }
+        });
+        if(!res.ok) throw new Error("API failed");
+        return await res.json();
+      } catch(e) {
+        console.error(e);
+        return null;
+      }
+    }
+
+    function getAccountLevel(exp) {
+      const level = Math.max(1, Math.floor(exp / 120) + 1);
+      const current = exp % 120;
+      return { level, current, next:120, percent:(current / 120) * 100 };
+    }
+
+    let currentProfileData = null;
+
+    async function renderProfile() {
+      const data = await fetchProfileData();
+      if (!data) return; // Not logged in or server error
+      currentProfileData = data;
+
+      const safeNumber = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
+      const exp = safeNumber(data.exp);
+      const level = getAccountLevel(exp);
+      const totalMatches = safeNumber(data.matches);
+      const totalWins = safeNumber(data.wins);
+      const winrate = totalMatches ? Math.round((totalWins / totalMatches) * 100) : 0;
+
+      document.getElementById("profileName").innerText = data.name || "";
+      document.getElementById("profileUsername").innerText = data.username ? "@" + data.username : "";
+      document.getElementById("profileBio").innerText = data.bio || "";
+      document.getElementById("profileCountry").innerText = data.country || "-";
+      document.getElementById("profileProvince").innerText = data.province || "-";
+      document.getElementById("profileCity").innerText = data.city || "-";
+      document.getElementById("profileClass").innerText = data.class_level || "-";
+      document.getElementById("profileSchool").innerText = data.school || "-";
+      const avatarUrl = data.avatar || "https://i.pravatar.cc/100?img=12";
+      document.getElementById("profileAvatar").src = avatarUrl;
+      document.getElementById("navProfileImg").src = avatarUrl;
+      document.getElementById("profileLevelChip").innerText = "Lv. " + level.level;
+      document.getElementById("accountLevel").innerText = "Level " + level.level;
+      document.getElementById("accountExpFill").style.width = level.percent + "%";
+      document.getElementById("accountExpText").innerText = `${level.current} / ${level.next} EXP`;
+      
+      const totalElo = safeNumber(data.elo_matematika) + safeNumber(data.elo_fisika) + safeNumber(data.elo_bahasainggris) + safeNumber(data.elo_informatika);
+      document.getElementById("profileTotalELO").innerText = totalElo.toLocaleString();
+      document.getElementById("profileMatches").innerText = totalMatches.toLocaleString();
+      document.getElementById("profileWinrate").innerText = winrate + "%";
+
+      document.getElementById("profileSubjectRanks").innerHTML = SUBJECTS.map(subject => {
+        const elo = safeNumber(data['elo_' + subject.key.replace('-', '')]); // Handle keys
+        const rank = getRankFromELO(elo);
+        const progress = getRankProgress(elo);
+        const highest = data['highest_' + subject.key.replace('-', '')] || "0";
+        return `
+          <button class="rank-subject-card" onclick="showRankInfoModal('${subject.key}')">
+            <div class="rank-subject-main">
+              <span class="rank-mini-badge ${rank.class}"><i class="fa-solid ${rank.icon}"></i></span>
+              <div>
+                <h4>${subject.label}</h4>
+                <p>Current ${rank.name} · Highest ${highest}</p>
+              </div>
+            </div>
+            <strong>${elo.toLocaleString()} ELO</strong>
+            <div class="rank-info-progress"><div class="rank-info-progress-fill" style="width:${progress.percent}%"></div></div>
+          </button>
+        `;
+      }).join("");
+
+      // Update verification badges
+      const fields = [
+          { id: 'Province', val: data.province },
+          { id: 'City',     val: data.city },
+          { id: 'School',   val: data.school },
+          { id: 'Class',    val: data.class_level },
+      ];
+      fields.forEach(({ id, val }) => {
+          const badge = document.getElementById('badge' + id);
+          if (!badge) return;
+          const isVerified = val && val !== '-';
+          badge.className = 'verify-badge ' + (isVerified ? 'verified' : 'unverified');
+          badge.textContent = isVerified ? '✓ Terverifikasi' : '⏳ Menunggu verifikasi';
+      });
+    }
+
+    function openEditProfileModal() {
+      const fallbackData = currentProfileData || {
+        name: document.getElementById("profileName")?.innerText || "",
+        username: (document.getElementById("profileUsername")?.innerText || "").replace(/^@/, ""),
+        email: "",
+        bio: document.getElementById("profileBio")?.innerText || "",
+        country: document.getElementById("profileCountry")?.innerText || "",
+        class_level: document.getElementById("profileClass")?.innerText || "",
+        school: document.getElementById("profileSchool")?.innerText || "",
+        avatar: document.getElementById("profileAvatar")?.src || "https://i.pravatar.cc/100?img=12"
+      };
+
+      document.getElementById("editName").value = fallbackData.name || "";
+      document.getElementById("editUsername").value = fallbackData.username || "";
+      document.getElementById("editEmail").value = fallbackData.email || "";
+      document.getElementById("editBio").value = fallbackData.bio || "";
+      document.getElementById("editCountry").value = fallbackData.country || "";
+      document.getElementById("editClass").value = fallbackData.class_level || "";
+      document.getElementById("editSchool").value = fallbackData.school || "";
+      document.getElementById("editAvatarPreview").src = fallbackData.avatar || "https://i.pravatar.cc/100?img=12";
+      document.getElementById("editProfileOverlay").classList.add("show");
+    }
+
+    function closeEditProfileModal() {
+      document.getElementById("editProfileOverlay").classList.remove("show");
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      renderProfile();
+      // Auto-refresh profile every 30 seconds to reflect developer changes from CSV/admin
+      setInterval(() => {
+          renderProfile();
+      }, 30000);
+      document.getElementById("editAvatarInput").addEventListener("change", function() {
+        if(this.files && this.files[0]) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            currentProfileData.avatar = event.target.result;
+            document.getElementById("editAvatarPreview").src = event.target.result;
+          };
+          reader.readAsDataURL(this.files[0]);
+        }
+      });
+      document.getElementById("editProfileForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        
+        const updateData = {
+          name: document.getElementById("editName").value,
+          bio: document.getElementById("editBio").value,
+          avatar: currentProfileData.avatar
+        };
+
+        try {
+          const token = localStorage.getItem("edurank_token");
+          const res = await fetch(getApiUrl('/api/profile'), {
+            method: "PUT",
+            headers: { 
+              "Content-Type": "application/json",
+              "Authorization": "Bearer " + token
+            },
+            body: JSON.stringify(updateData)
+          });
+          if(res.ok) {
+            closeEditProfileModal();
+            renderProfile();
+            showCustomAlert("Profile berhasil diperbarui.", "success");
+          } else {
+            const data = await res.json();
+            showCustomAlert(data.error || "Gagal update profile", "error");
+          }
+        } catch(e) {
+          showCustomAlert("Gagal terhubung ke server", "error");
+        }
+      });
+    });
+  </script>
+</body>
+</html>
