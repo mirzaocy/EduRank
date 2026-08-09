@@ -2485,10 +2485,22 @@ function initAuthGate(){
     const learningQuiz = document.getElementById("learningQuiz");
     const params = new URLSearchParams(window.location.search);
     const shouldOpenMain = params.get("view") === "main";
+    const hasToken = !!localStorage.getItem("edurank_token");
+    const isLoggedIn = localStorage.getItem("edurankLoggedIn") === "true";
+    const learned = !!localStorage.getItem("learningStyle");
 
     if(shouldOpenMain){
         unlockEduRank(false);
         setTimeout(scrollToRequestedSection, 80);
+        return;
+    }
+
+    if(isLoggedIn && hasToken){
+        if(learned){
+            unlockEduRank(false);
+            return;
+        }
+        startLearningStyleQuiz();
         return;
     }
 
@@ -2723,7 +2735,12 @@ function handleLoginSubmit(event){
         localStorage.setItem("username", data.user.username);
         localStorage.setItem("email", data.user.email);
         localStorage.setItem("edurankLoggedIn", "true");
-        startLearningStyleQuiz();
+
+        if(localStorage.getItem("learningStyle")){
+            unlockEduRank(true);
+        } else {
+            startLearningStyleQuiz();
+        }
     })
     .catch(() => {
         showCustomAlert("Gagal terhubung ke server.", "error");
