@@ -53,7 +53,7 @@ app.use(express.static(clientRoot));
 // Keep existing /client/* links working while the public root is the client app.
 app.use('/client', express.static(clientRoot));
 // The static pages use their historic flat asset names (for example,
-// `style.css` and `interaksi.js`). Keep those URLs working while the files
+// `/css/style.css` and `interaksi.js`). Keep those URLs working while the files
 // remain organized by asset type.
 app.use('/pages', express.static(path.join(clientRoot, 'pages')));
 app.use('/pages', express.static(path.join(clientRoot, 'css')));
