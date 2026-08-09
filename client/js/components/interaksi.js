@@ -333,8 +333,11 @@ function loadProfile() {
     const username = profile.username || "guest";
     const bio = profile.bio || "";
     const country = profile.country || "";
-    const rank = localStorage.getItem("rank") || "Bronze";
+    const subjectKey = getPrimarySubjectKey();
+    const rankData = getRankFromELO(profile[`elo_${subjectKey}`]);
+    const rank = rankData.name || localStorage.getItem("rank") || "Bronze";
     const avatar = profile.avatar;
+    localStorage.setItem("rank", rank);
 
     // navbar
     const navName = document.getElementById("navProfileName");
@@ -2478,26 +2481,37 @@ document.addEventListener("click", (event) => {
     }
 });
 
-function initAuthGate(){
+async function initAuthGate(){
     const authGate = document.getElementById("authGate");
     if(!authGate) return;
 
     const learningQuiz = document.getElementById("learningQuiz");
     const params = new URLSearchParams(window.location.search);
     const shouldOpenMain = params.get("view") === "main";
-    const hasToken = !!localStorage.getItem("edurank_token");
-    const isLoggedIn = localStorage.getItem("edurankLoggedIn") === "true";
+    const token = localStorage.getItem("edurank_token");
+    const hasToken = !!token;
     const learned = !!localStorage.getItem("learningStyle");
 
     if(shouldOpenMain){
-        unlockEduRank(false);
+        await unlockEduRank(false);
         setTimeout(scrollToRequestedSection, 80);
         return;
     }
 
-    if(isLoggedIn && hasToken){
+    if(hasToken){
+        localStorage.setItem("edurankLoggedIn", "true");
+        const res = await syncProfileWithServer();
+        if (!res || !res.ok) {
+            localStorage.removeItem("edurank_token");
+            localStorage.removeItem("edurankLoggedIn");
+            document.body.classList.add("auth-locked");
+            document.body.classList.remove("quiz-locked");
+            authGate.classList.remove("hidden");
+            if(learningQuiz) learningQuiz.classList.add("hidden");
+            return;
+        }
         if(learned){
-            unlockEduRank(false);
+            await unlockEduRank(false);
             return;
         }
         startLearningStyleQuiz();
@@ -2770,13 +2784,14 @@ function saveAuthUser(user){
     if(!localStorage.getItem("rank")) localStorage.setItem("rank", "");
 }
 
-function unlockEduRank(showMessage){
+async function unlockEduRank(showMessage){
     const authGate = document.getElementById("authGate");
     const learningQuiz = document.getElementById("learningQuiz");
     document.body.classList.remove("auth-locked");
     document.body.classList.remove("quiz-locked");
     if(authGate) authGate.classList.add("hidden");
     if(learningQuiz) learningQuiz.classList.add("hidden");
+    await syncProfileWithServer();
     loadProfile();
     updateRankBadges();
     window.scrollTo({ top:0, behavior:"smooth" });
@@ -3036,11 +3051,24 @@ async function syncProfileWithServer() {
             localStorage.setItem("school", data.school || "-");
             localStorage.setItem("class_level", data.class_level || "-");
             if (data.avatar) localStorage.setItem("avatar", data.avatar);
-            loadProfile();
+            localStorage.setItem("exp", Number.isFinite(Number(data.exp)) ? String(data.exp) : "0");
+            localStorage.setItem("matches", Number.isFinite(Number(data.matches)) ? String(data.matches) : "0");
+            localStorage.setItem("wins", Number.isFinite(Number(data.wins)) ? String(data.wins) : "0");
+            localStorage.setItem("elo_matematika", Number.isFinite(Number(data.elo_matematika)) ? String(data.elo_matematika) : "0");
+            localStorage.setItem("elo_fisika", Number.isFinite(Number(data.elo_fisika)) ? String(data.elo_fisika) : "0");
+            localStorage.setItem("elo_bahasainggris", Number.isFinite(Number(data.elo_bahasainggris)) ? String(data.elo_bahasainggris) : "0");
+            localStorage.setItem("elo_informatika", Number.isFinite(Number(data.elo_informatika)) ? String(data.elo_informatika) : "0");
             if (document.getElementById("friendsList")) {
                 refreshFriendsList();
             }
+            return res;
         }
+
+        if (res.status === 401) {
+            localStorage.removeItem("edurank_token");
+            localStorage.removeItem("edurankLoggedIn");
+        }
+
         return res;
     } catch(e) {
         console.error("Failed to sync profile:", e);

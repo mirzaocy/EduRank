@@ -63,31 +63,46 @@ const pool = mysql.createPool({
 
 const simpleDb = require('../simple-db');
 
+const forceSimpleDb = Boolean(process.env.EDURANK_DB_PATH);
 let mysqlConnected = false;
 
 function useSimpleDb() {
-    return Boolean(process.env.EDURANK_DB_PATH) || (!mysqlConnected && process.env.NODE_ENV !== 'production');
+    return forceSimpleDb || (!mysqlConnected && process.env.NODE_ENV !== 'production');
+}
+
+if (process.env.NODE_ENV !== 'production') {
+    console.log('[DB] Resolved DB config:', {
+        host: resolvedHost,
+        user: resolvedUser,
+        database: resolvedDatabase,
+        port: resolvedPort,
+        env: process.env.NODE_ENV,
+        edurankDbPath: process.env.EDURANK_DB_PATH || '(none)',
+        forceSimpleDb
+    });
 }
 
 // Test connection on startup
-pool.getConnection((err, connection) => {
-    if (err) {
-        mysqlConnected = false;
-        if (!process.env.EDURANK_DB_PATH) {
+if (!forceSimpleDb) {
+    pool.getConnection((err, connection) => {
+        if (err) {
+            mysqlConnected = false;
             console.error('\n================================================================');
             console.error('[MYSQL-ERROR] Gagal terhubung ke database MySQL! Menggunakan fallback database.');
             console.error(`Pesan Error: ${err.message}`);
             console.error('================================================================\n');
+            return;
         }
-        return;
-    }
-    mysqlConnected = true;
-    console.log('[MYSQL] Koneksi ke MySQL berhasil dibangun.');
-    connection.release();
-    // In development the initial schema check may have selected the local
-    // fallback before this asynchronous connection succeeded.
-    if (process.env.NODE_ENV !== 'production') initDb();
-});
+        mysqlConnected = true;
+        console.log('[MYSQL] Koneksi ke MySQL berhasil dibangun.');
+        connection.release();
+        // In development the initial schema check may have selected the local
+        // fallback before this asynchronous connection succeeded.
+        if (process.env.NODE_ENV !== 'production') initDb();
+    });
+} else {
+    console.log('[DB] EDURANK_DB_PATH is set; forcing simple JSON database fallback.');
+}
 
 // Auto-initialize tables
 function initDb() {

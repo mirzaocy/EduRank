@@ -201,6 +201,7 @@ module.exports = {
     getBattleHistory,
     getLeaderboard,
     getAllUsers,
+    countAdminUsers,
     adminUpdateUser,
     adminBanUser,
     adminDeleteUser
