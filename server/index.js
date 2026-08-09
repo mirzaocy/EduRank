@@ -50,6 +50,9 @@ app.use(express.json({ limit: '2mb' }));
 // Only publish browser assets. Serving the project root exposes server source,
 // dependency metadata, and other implementation files to every visitor.
 app.use(express.static(clientRoot));
+// Expose page HTML at root-level filenames so homepage links like
+// `/leaderboard.html` and `/feedback.html` work without requiring `/pages/`.
+app.use(express.static(path.join(clientRoot, 'pages')));
 // Keep existing /client/* links working while the public root is the client app.
 app.use('/client', express.static(clientRoot));
 // The static pages use their historic flat asset names (for example,
