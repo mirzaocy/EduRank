@@ -7,6 +7,7 @@ const router = require('./routes');
 const db = require('./config');
 const { initSockets } = require('./sockets/matchmakingSocket');
 const { resolveServerConfig } = require('./config/serverConfig');
+const { authenticateToken, requireAdmin } = require('./middlewares/authMiddleware');
 const { normalizeSubject, validateMatchPayload } = require('./services/matchService');
 
 const app = express();
@@ -42,7 +43,10 @@ app.use((req, res, next) => {
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
     if (process.env.NODE_ENV === 'production') {
-        res.setHeader('Strict-Transport-Security', 'max-age=15552000; includeSubDomains');
+        const isSecure = req.secure || req.get('x-forwarded-proto') === 'https';
+        if (isSecure) {
+            res.setHeader('Strict-Transport-Security', 'max-age=15552000; includeSubDomains');
+        }
     }
     next();
 });
@@ -63,7 +67,26 @@ app.use('/pages', express.static(path.join(clientRoot, 'css')));
 app.use('/pages', express.static(path.join(clientRoot, 'js', 'components')));
 app.use('/pages', express.static(path.join(clientRoot, 'js', 'config')));
 app.use('/pages', express.static(path.join(clientRoot, 'js', 'pages')));
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+const uploadsRoot = path.join(__dirname, '../uploads');
+app.get('/uploads/:filename', requireAdmin, (req, res, next) => {
+    const requestedName = String(req.params.filename || '');
+    if (!requestedName || requestedName !== path.basename(requestedName)) {
+        return res.status(400).json({ error: 'Invalid file request.' });
+    }
+
+    const filePath = path.join(uploadsRoot, requestedName);
+    if (!filePath.startsWith(uploadsRoot + path.sep) && filePath !== uploadsRoot) {
+        return res.status(400).json({ error: 'Invalid file request.' });
+    }
+
+    res.sendFile(filePath, (err) => {
+        if (err) {
+            if (err.code === 'ENOENT') return res.status(404).json({ error: 'Not found.' });
+            next(err);
+        }
+    });
+});
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(clientRoot, 'pages', 'index.html'));
