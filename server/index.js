@@ -62,6 +62,10 @@ app.use('/pages', express.static(path.join(clientRoot, 'js', 'config')));
 app.use('/pages', express.static(path.join(clientRoot, 'js', 'pages')));
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
+app.get('/', (req, res) => {
+    res.sendFile(path.join(clientRoot, 'pages', 'index.html'));
+});
+
 // Mount routes
 app.use(router);
 
