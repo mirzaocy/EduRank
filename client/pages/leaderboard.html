@@ -382,7 +382,7 @@
             if(!res.ok) throw new Error("API fail");
             const data = await res.json();
             
-            if (data.error && data.error === "LOKASI_BELUM_VERIFIKASI") {
+            if (data && data.error === "LOKASI_BELUM_VERIFIKASI") {
                 list.innerHTML = `
                     <div style="text-align: center; padding: 50px 20px; color: var(--text-light);">
                         <i class="fa-solid fa-location-crosshairs" style="font-size: 3.5rem; color: var(--primary); margin-bottom: 20px; opacity: 0.8;"></i>
@@ -392,6 +392,11 @@
                         </p>
                     </div>
                 `;
+                return;
+            }
+
+            if (!Array.isArray(data)) {
+                list.innerHTML = '<p style="text-align:center; color:red;">Tidak dapat memuat leaderboard. Coba lagi nanti.</p>';
                 return;
             }
             

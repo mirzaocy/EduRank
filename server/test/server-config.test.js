@@ -9,6 +9,15 @@ test('resolveServerConfig uses Railway-friendly defaults', () => {
 });
 
 test('resolveServerConfig falls back to local defaults', () => {
-  const config = resolveServerConfig({});
-  assert.deepEqual(config, { port: 3000, host: '0.0.0.0' });
+  const originalHost = process.env.HOST;
+  const originalHostLower = process.env.host;
+  try {
+    delete process.env.HOST;
+    delete process.env.host;
+    const config = resolveServerConfig({});
+    assert.deepEqual(config, { port: 3000, host: '0.0.0.0' });
+  } finally {
+    if (originalHost !== undefined) process.env.HOST = originalHost;
+    if (originalHostLower !== undefined) process.env.host = originalHostLower;
+  }
 });

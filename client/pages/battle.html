@@ -266,6 +266,16 @@
         window.location.href = "index.html";
     }
 
+    const myInitialName = localStorage.getItem('name') || 'You';
+    const myInitialAvatar = localStorage.getItem('avatar') || 'https://i.pravatar.cc/100?img=12';
+    const myScoreEl = document.getElementById('myScore');
+    const oppScoreEl = document.getElementById('oppScore');
+
+    document.getElementById('myName').innerText = myInitialName;
+    document.getElementById('myAvatar').src = myInitialAvatar;
+    if(myScoreEl) myScoreEl.innerText = '0';
+    if(oppScoreEl) oppScoreEl.innerText = '0';
+
     const socketBase = window.EduRankConfig && typeof window.EduRankConfig.getSocketUrl === 'function'
         ? window.EduRankConfig.getSocketUrl()
         : window.location.origin;
@@ -412,9 +422,13 @@
         startTimer();
         updateProgressBar();
 
-        let oppData = data.p2;
-        if(data.p2 && data.p2.name === localStorage.getItem('name')) {
-            oppData = data.p1;
+        const localName = localStorage.getItem('name');
+        const ownPlayer = data.p1 && data.p1.name === localName ? data.p1 : data.p2;
+        const oppData = ownPlayer === data.p1 ? data.p2 : data.p1;
+
+        if (ownPlayer && ownPlayer.name) {
+            document.getElementById('myName').innerText = ownPlayer.name;
+            document.getElementById('myAvatar').src = ownPlayer.avatar || myInitialAvatar;
         }
 
         document.getElementById('oppName').innerText = oppData && oppData.name ? oppData.name : 'Opponent';
@@ -471,6 +485,14 @@
     socket.on('matchFinished', (data) => {
         matchFinished = true;
         if(timerInterval) clearInterval(timerInterval);
+        if(data && Number.isFinite(data.score)) {
+            const myScoreEl = document.getElementById('myScore');
+            if(myScoreEl) myScoreEl.innerText = String(data.score);
+        }
+        if(data && Number.isFinite(data.oppScore)) {
+            const oppScoreEl = document.getElementById('oppScore');
+            if(oppScoreEl) oppScoreEl.innerText = String(data.oppScore);
+        }
         persistBattleSummary({
             score: data && Number.isFinite(data.score) ? data.score : 0,
             oppScore: data && Number.isFinite(data.oppScore) ? data.oppScore : 0,
@@ -483,7 +505,7 @@
     });
 
     function handleAction() {
-        if(matchFinished || !questionId || answerLocked) return;
+        if (matchFinished || questionId == null || answerLocked) return;
         
         const selected = document.querySelector('input[name="answer"]:checked');
         if(!selected) {

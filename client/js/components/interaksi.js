@@ -1970,23 +1970,37 @@ function getTotalSubjectELO() {
 
 function getCurrentProfileState() {
     const profile = serverProfileCache || {};
+    const getString = (key, fallback = "") => {
+        if (profile[key] !== undefined && profile[key] !== null && String(profile[key]).trim() !== "") {
+            return profile[key];
+        }
+        return localStorage.getItem(key) || fallback;
+    };
+
+    const getNumber = (key, fallback = 0) => {
+        const value = profile[key] !== undefined && profile[key] !== null ? Number(profile[key]) : null;
+        if (Number.isFinite(value)) return value;
+        const stored = Number(localStorage.getItem(key));
+        return Number.isFinite(stored) ? stored : fallback;
+    };
+
     return {
-        name: profile.name || localStorage.getItem("name") || "",
-        username: profile.username || localStorage.getItem("username") || "",
-        bio: profile.bio || localStorage.getItem("bio") || "",
-        country: profile.country || localStorage.getItem("country") || "",
-        province: profile.province || localStorage.getItem("province") || "-",
-        city: profile.city || localStorage.getItem("city") || "-",
-        school: profile.school || localStorage.getItem("school") || "-",
-        class_level: profile.class_level || localStorage.getItem("class_level") || "-",
-        avatar: profile.avatar || localStorage.getItem("avatar") || "https://i.pravatar.cc/100?img=12",
-        exp: Number.isFinite(Number(profile.exp)) ? Number(profile.exp) : 0,
-        matches: Number.isFinite(Number(profile.matches)) ? Number(profile.matches) : 0,
-        wins: Number.isFinite(Number(profile.wins)) ? Number(profile.wins) : 0,
-        elo_matematika: Number.isFinite(Number(profile.elo_matematika)) ? Number(profile.elo_matematika) : 0,
-        elo_fisika: Number.isFinite(Number(profile.elo_fisika)) ? Number(profile.elo_fisika) : 0,
-        elo_bahasainggris: Number.isFinite(Number(profile.elo_bahasainggris)) ? Number(profile.elo_bahasainggris) : 0,
-        elo_informatika: Number.isFinite(Number(profile.elo_informatika)) ? Number(profile.elo_informatika) : 0
+        name: getString("name", ""),
+        username: getString("username", ""),
+        bio: getString("bio", ""),
+        country: getString("country", ""),
+        province: getString("province", "-"),
+        city: getString("city", "-"),
+        school: getString("school", "-"),
+        class_level: getString("class_level", "-"),
+        avatar: getString("avatar", "https://i.pravatar.cc/100?img=12"),
+        exp: getNumber("exp", 0),
+        matches: getNumber("matches", 0),
+        wins: getNumber("wins", 0),
+        elo_matematika: getNumber("elo_matematika", 0),
+        elo_fisika: getNumber("elo_fisika", 0),
+        elo_bahasainggris: getNumber("elo_bahasainggris", 0),
+        elo_informatika: getNumber("elo_informatika", 0)
     };
 }
 

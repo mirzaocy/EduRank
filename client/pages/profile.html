@@ -242,25 +242,51 @@
 
     async function renderProfile() {
       const data = await fetchProfileData();
-      if (!data) return; // Not logged in or server error
-      currentProfileData = data;
+      if (!data) {
+          const fallback = {
+              name: localStorage.getItem('name') || 'Guest User',
+              username: localStorage.getItem('username') || '-',
+              bio: localStorage.getItem('bio') || '',
+              country: localStorage.getItem('country') || '-',
+              province: localStorage.getItem('province') || '-',
+              city: localStorage.getItem('city') || '-',
+              school: localStorage.getItem('school') || '-',
+              class_level: localStorage.getItem('class_level') || '-',
+              avatar: localStorage.getItem('avatar') || 'https://i.pravatar.cc/100?img=12',
+              exp: Number(localStorage.getItem('exp') || 0),
+              matches: Number(localStorage.getItem('matches') || 0),
+              wins: Number(localStorage.getItem('wins') || 0),
+              elo_matematika: Number(localStorage.getItem('elo_matematika') || 0),
+              elo_fisika: Number(localStorage.getItem('elo_fisika') || 0),
+              elo_bahasainggris: Number(localStorage.getItem('elo_bahasainggris') || 0),
+              elo_informatika: Number(localStorage.getItem('elo_informatika') || 0),
+              highest_matematika: localStorage.getItem('highest_matematika') || '0',
+              highest_fisika: localStorage.getItem('highest_fisika') || '0',
+              highest_bahasainggris: localStorage.getItem('highest_bahasainggris') || '0',
+              highest_informatika: localStorage.getItem('highest_informatika') || '0'
+          };
+          currentProfileData = fallback;
+      } else {
+          currentProfileData = data;
+      }
 
+      const profile = currentProfileData;
       const safeNumber = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
-      const exp = safeNumber(data.exp);
+      const exp = safeNumber(profile.exp);
       const level = getAccountLevel(exp);
-      const totalMatches = safeNumber(data.matches);
-      const totalWins = safeNumber(data.wins);
+      const totalMatches = safeNumber(profile.matches);
+      const totalWins = safeNumber(profile.wins);
       const winrate = totalMatches ? Math.round((totalWins / totalMatches) * 100) : 0;
 
-      document.getElementById("profileName").innerText = data.name || "";
-      document.getElementById("profileUsername").innerText = data.username ? "@" + data.username : "";
-      document.getElementById("profileBio").innerText = data.bio || "";
-      document.getElementById("profileCountry").innerText = data.country || "-";
-      document.getElementById("profileProvince").innerText = data.province || "-";
-      document.getElementById("profileCity").innerText = data.city || "-";
-      document.getElementById("profileClass").innerText = data.class_level || "-";
-      document.getElementById("profileSchool").innerText = data.school || "-";
-      const avatarUrl = data.avatar || "https://i.pravatar.cc/100?img=12";
+      document.getElementById("profileName").innerText = profile.name || "";
+      document.getElementById("profileUsername").innerText = profile.username ? "@" + profile.username : "";
+      document.getElementById("profileBio").innerText = profile.bio || "";
+      document.getElementById("profileCountry").innerText = profile.country || "-";
+      document.getElementById("profileProvince").innerText = profile.province || "-";
+      document.getElementById("profileCity").innerText = profile.city || "-";
+      document.getElementById("profileClass").innerText = profile.class_level || "-";
+      document.getElementById("profileSchool").innerText = profile.school || "-";
+      const avatarUrl = profile.avatar || "https://i.pravatar.cc/100?img=12";
       document.getElementById("profileAvatar").src = avatarUrl;
       document.getElementById("navProfileImg").src = avatarUrl;
       document.getElementById("profileLevelChip").innerText = "Lv. " + level.level;
@@ -268,16 +294,16 @@
       document.getElementById("accountExpFill").style.width = level.percent + "%";
       document.getElementById("accountExpText").innerText = `${level.current} / ${level.next} EXP`;
       
-      const totalElo = safeNumber(data.elo_matematika) + safeNumber(data.elo_fisika) + safeNumber(data.elo_bahasainggris) + safeNumber(data.elo_informatika);
+      const totalElo = safeNumber(profile.elo_matematika) + safeNumber(profile.elo_fisika) + safeNumber(profile.elo_bahasainggris) + safeNumber(profile.elo_informatika);
       document.getElementById("profileTotalELO").innerText = totalElo.toLocaleString();
       document.getElementById("profileMatches").innerText = totalMatches.toLocaleString();
       document.getElementById("profileWinrate").innerText = winrate + "%";
 
       document.getElementById("profileSubjectRanks").innerHTML = SUBJECTS.map(subject => {
-        const elo = safeNumber(data['elo_' + subject.key.replace('-', '')]); // Handle keys
+        const elo = safeNumber(profile['elo_' + subject.key.replace('-', '')]); // Handle keys
         const rank = getRankFromELO(elo);
         const progress = getRankProgress(elo);
-        const highest = data['highest_' + subject.key.replace('-', '')] || "0";
+        const highest = profile['highest_' + subject.key.replace('-', '')] || "0";
         return `
           <button class="rank-subject-card" onclick="showRankInfoModal('${subject.key}')">
             <div class="rank-subject-main">
@@ -295,10 +321,10 @@
 
       // Update verification badges
       const fields = [
-          { id: 'Province', val: data.province },
-          { id: 'City',     val: data.city },
-          { id: 'School',   val: data.school },
-          { id: 'Class',    val: data.class_level },
+          { id: 'Province', val: profile.province },
+          { id: 'City',     val: profile.city },
+          { id: 'School',   val: profile.school },
+          { id: 'Class',    val: profile.class_level },
       ];
       fields.forEach(({ id, val }) => {
           const badge = document.getElementById('badge' + id);
