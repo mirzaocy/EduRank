@@ -32,43 +32,55 @@ async function registerUser(body) {
     const username = trimmedEmail.split('@')[0].slice(0, 50);
 
     return new Promise((resolve) => {
-        userModel.createUser(
-            {
-                username,
-                email: trimmedEmail,
-                hashedPassword,
-                nama: trimmedName,
-                safeBirthDate,
-                photoUrl: saveInfo.studentPhotoUrl,
-                studentCardPhotoUrl: saveInfo.studentCardPhotoUrl
-            },
-            function (err) {
-                if (err) {
-                    console.error("Register DB error code:", err.code, "message:", err.message);
-                    if (err.code === 'ER_DUP_ENTRY' || String(err.message).includes('UNIQUE') || String(err.message).includes('duplicate')) {
-                        return resolve({ status: 400, error: "Email sudah terdaftar." });
-                    }
-                    return resolve({ status: 500, error: "Gagal menyimpan ke database." });
-                }
-
-                const userId = this.lastID || this.insertId;
-                const token = jwt.sign({ id: userId, email: trimmedEmail }, getJwtSecret(), { expiresIn: '7d' });
-
-                resolve({
-                    status: 200,
-                    data: {
-                        message: "Registration successful",
-                        token,
-                        user: {
-                            id: userId,
-                            name: trimmedName,
-                            email: trimmedEmail,
-                            username
-                        }
-                    }
-                });
+        userModel.countAdminUsers((countErr, row) => {
+            if (countErr) {
+                console.error('Failed to count admin users:', countErr);
+                return resolve({ status: 500, error: 'Gagal memproses pendaftaran.' });
             }
-        );
+
+            const isFirstAdmin = !row || row.adminCount === 0;
+            const userRole = isFirstAdmin ? 'admin' : 'siswa';
+
+            userModel.createUser(
+                {
+                    username,
+                    email: trimmedEmail,
+                    hashedPassword,
+                    nama: trimmedName,
+                    safeBirthDate,
+                    photoUrl: saveInfo.studentPhotoUrl,
+                    studentCardPhotoUrl: saveInfo.studentCardPhotoUrl,
+                    role: userRole
+                },
+                function (err) {
+                    if (err) {
+                        console.error("Register DB error code:", err.code, "message:", err.message);
+                        if (err.code === 'ER_DUP_ENTRY' || String(err.message).includes('UNIQUE') || String(err.message).includes('duplicate')) {
+                            return resolve({ status: 400, error: "Email sudah terdaftar." });
+                        }
+                        return resolve({ status: 500, error: "Gagal menyimpan ke database." });
+                    }
+
+                    const userId = this.lastID || this.insertId;
+                    const token = jwt.sign({ id: userId, email: trimmedEmail }, getJwtSecret(), { expiresIn: '7d' });
+
+                    resolve({
+                        status: 200,
+                        data: {
+                            message: "Registration successful",
+                            token,
+                            user: {
+                                id: userId,
+                                name: trimmedName,
+                                email: trimmedEmail,
+                                username,
+                                role: userRole
+                            }
+                        }
+                    });
+                }
+            );
+        });
     });
 }
 

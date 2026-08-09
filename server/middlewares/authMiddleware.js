@@ -11,14 +11,14 @@ const authenticateToken = (req, res, next) => {
     jwt.verify(token, secret, { algorithms: ['HS256'] }, (err, user) => {
         if (err) return res.sendStatus(403);
         
-        db.get(`SELECT banned FROM users WHERE id = ?`, [user.id], (dbErr, dbUser) => {
+        db.get(`SELECT banned, role FROM users WHERE id = ?`, [user.id], (dbErr, dbUser) => {
             if (dbErr || !dbUser) {
                 return res.sendStatus(403);
             }
             if (dbUser.banned) {
                 return res.status(403).json({ error: "Akun anda telah diban" });
             }
-            req.user = user;
+            req.user = { ...user, role: dbUser.role };
             next();
         });
     });
@@ -26,14 +26,19 @@ const authenticateToken = (req, res, next) => {
 
 const requireAdmin = (req, res, next) => {
     authenticateToken(req, res, () => {
+        if (req.user.role === 'admin') {
+            return next();
+        }
+
         const adminIds = String(process.env.ADMIN_USER_IDS || '')
             .split(',')
             .map((id) => Number(id.trim()))
             .filter(Number.isInteger);
-        if (!adminIds.includes(Number(req.user.id))) {
-            return res.sendStatus(403);
+        if (adminIds.includes(Number(req.user.id))) {
+            return next();
         }
-        next();
+
+        return res.sendStatus(403);
     });
 };
 

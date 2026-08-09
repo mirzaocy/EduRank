@@ -21,7 +21,7 @@ function getMatchPlayers(ids, subject, callback) {
 }
 
 function createUser(userData, callback) {
-    const { username, email, hashedPassword, nama, safeBirthDate, photoUrl } = userData;
+    const { username, email, hashedPassword, nama, safeBirthDate, photoUrl, role } = userData;
     db.run(
         `INSERT INTO users (username, email, password, nama, tanggal_lahir, foto, role, bio, avatar, student_photo, student_card_photo, status) 
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -32,7 +32,7 @@ function createUser(userData, callback) {
             nama,
             safeBirthDate,
             photoUrl,
-            'siswa',
+            role || 'siswa',
             null,
             null,
             photoUrl,
@@ -41,6 +41,10 @@ function createUser(userData, callback) {
         ],
         callback
     );
+}
+
+function countAdminUsers(callback) {
+    db.get(`SELECT COUNT(*) AS adminCount FROM users WHERE role = 'admin'`, [], callback);
 }
 
 function getUserProfile(id, callback) {
