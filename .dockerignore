@@ -1,0 +1,13 @@
+.git
+.github
+node_modules
+server/node_modules
+.env
+.env.*
+server/.env
+server/.env.*
+uploads
+server/uploads
+server/edurank.json
+*.log
+README.md

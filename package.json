@@ -1,0 +1,21 @@
+{
+  "name": "edurank",
+  "private": true,
+  "workspaces": [
+    "server"
+  ],
+  "scripts": {
+    "start": "npm --prefix server start"
+  },
+  "engines": {
+    "node": ">=20.17.0"
+  },
+  "allowScripts": {  
+    "bcrypt": true,
+    "sqlite3": true
+  },
+  "dependencies": {
+    "node-gyp": "^13.0.1",
+    "rebuild": "^0.1.2"
+  }
+}
