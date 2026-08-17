@@ -339,6 +339,7 @@
         localStorage.setItem('eloChange', Number.isFinite(data.eloChange) ? data.eloChange : 0);
         localStorage.setItem('isWin', data.isWin);
         localStorage.setItem('newElo', Number.isFinite(data.newElo) ? data.newElo : 0);
+        if (data.matchId) localStorage.setItem('matchId', String(data.matchId));
     }
 
     function startTimer() {

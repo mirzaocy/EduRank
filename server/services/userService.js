@@ -109,6 +109,20 @@ function getBattleHistory(userId) {
     });
 }
 
+function getMatchDetail(userId, matchId) {
+    const mid = Number(matchId);
+    if (!Number.isInteger(mid) || mid <= 0) {
+        return Promise.resolve({ status: 400, error: 'Invalid match id' });
+    }
+    return new Promise((resolve) => {
+        userModel.getMatchDetail(mid, userId, (err, row) => {
+            if (err) return resolve({ status: 500, error: 'Database error' });
+            if (!row) return resolve({ status: 404, error: 'Match not found' });
+            resolve({ status: 200, data: row });
+        });
+    });
+}
+
 function getLeaderboard(query, authHeader) {
     const allowedSubjects = ['matematika', 'fisika', 'informatika', 'bahasainggris', 'all'];
     const rawSubject = query.subject || 'all';
@@ -225,6 +239,7 @@ module.exports = {
     addFriend,
     deleteFriend,
     getBattleHistory,
+    getMatchDetail,
     getLeaderboard,
     getAllUsers,
     adminUpdateUser,

@@ -166,6 +166,7 @@ function initDb() {
             is_win TINYINT NOT NULL,
             elo_change INT DEFAULT 0,
             duration_seconds INT DEFAULT 0,
+            details LONGTEXT DEFAULT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             INDEX idx_match_history_user_id (user_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -212,6 +213,19 @@ function initDb() {
                     console.error('[MYSQL-ERROR] Gagal menambah kolom match_history.duration_seconds:', alterErr.message);
                 } else {
                     console.log('[MYSQL] Kolom match_history.duration_seconds ditambahkan.');
+                }
+            });
+        }
+    });
+    // Ensure details column exists for storing per-question details as JSON (backwards compatible)
+    pool.query(`SHOW COLUMNS FROM match_history LIKE 'details'`, (showErr2, rows2) => {
+        if (showErr2) return;
+        if (!rows2 || rows2.length === 0) {
+            pool.query(`ALTER TABLE match_history ADD COLUMN details LONGTEXT DEFAULT NULL`, (alterErr) => {
+                if (alterErr) {
+                    console.error('[MYSQL-ERROR] Gagal menambah kolom match_history.details:', alterErr.message);
+                } else {
+                    console.log('[MYSQL] Kolom match_history.details ditambahkan.');
                 }
             });
         }

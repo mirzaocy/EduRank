@@ -205,7 +205,11 @@ function run(query, params = [], callback) {
     }
   } else if (sql.startsWith('INSERT INTO match_history')) {
     if (!data.matchHistory) data.matchHistory = [];
-    const [userId, opponentName, subject, mode, isWin, eloChange, durationSeconds, createdAt] = params;
+    const [userId, opponentName, subject, mode, isWin, eloChange, durationSeconds, createdAt, details] = params;
+    let parsedDetails = null;
+    if (details) {
+      try { parsedDetails = JSON.parse(details); } catch (e) { parsedDetails = details; }
+    }
     data.matchHistory.push({
       id: data.matchHistory.length ? Math.max(...data.matchHistory.map((row) => row.id || 0)) + 1 : 1,
       user_id: Number(userId),
@@ -215,6 +219,7 @@ function run(query, params = [], callback) {
       is_win: Number(isWin) || 0,
       elo_change: Number(eloChange) || 0,
       duration_seconds: Number(durationSeconds) || 0,
+      details: parsedDetails,
       created_at: String(createdAt || new Date().toISOString())
     });
     writeDb(data);

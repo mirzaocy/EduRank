@@ -131,24 +131,57 @@ function updateUserStats(userId, subject, isWin, newElo, callback) {
 }
 
 function recordMatchHistory(data, callback) {
-    const { userId, opponentName, subject, mode, isWin, eloChange, createdAt, durationSeconds } = data;
+    const { userId, opponentName, subject, mode, isWin, eloChange, createdAt, durationSeconds, details } = data;
+    const detailsJson = details ? JSON.stringify(details) : null;
     db.run(
-        `INSERT INTO match_history (user_id, opponent_name, subject, mode, is_win, elo_change, duration_seconds, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [userId, opponentName, subject, mode, isWin ? 1 : 0, eloChange, Number(durationSeconds) || 0, createdAt],
-        callback
+        `INSERT INTO match_history (user_id, opponent_name, subject, mode, is_win, elo_change, duration_seconds, created_at, details)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [userId, opponentName, subject, mode, isWin ? 1 : 0, eloChange, Number(durationSeconds) || 0, createdAt, detailsJson],
+        function (err) {
+            if (callback) return callback(err, this && this.lastID ? this.lastID : null);
+        }
     );
 }
 
 function getBattleHistory(userId, callback) {
     db.all(
-        `SELECT id, opponent_name, subject, mode, is_win, elo_change, duration_seconds, created_at
+        `SELECT id, opponent_name, subject, mode, is_win, elo_change, duration_seconds, created_at, details
          FROM match_history
          WHERE user_id = ?
          ORDER BY created_at DESC, id DESC
          LIMIT 20`,
         [userId],
-        callback
+        (err, rows) => {
+            if (err) return callback(err);
+            try {
+                const parsed = (rows || []).map((r) => ({
+                    ...r,
+                    details: r && r.details ? JSON.parse(r.details) : null
+                }));
+                return callback(null, parsed);
+            } catch (e) {
+                return callback(null, rows || []);
+            }
+        }
+    );
+}
+
+function getMatchDetail(matchId, userId, callback) {
+    db.get(
+        `SELECT id, user_id, opponent_name, subject, mode, is_win, elo_change, duration_seconds, created_at, details
+         FROM match_history
+         WHERE id = ? AND user_id = ? LIMIT 1`,
+        [matchId, userId],
+        (err, row) => {
+            if (err) return callback(err);
+            if (!row) return callback(null, null);
+            try {
+                row.details = row.details ? JSON.parse(row.details) : null;
+            } catch (e) {
+                row.details = null;
+            }
+            return callback(null, row);
+        }
     );
 }
 

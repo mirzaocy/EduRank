@@ -12,5 +12,6 @@ router.delete('/friends/:friendId', authenticateToken, userController.handleDele
 
 router.get('/leaderboard', userController.handleGetLeaderboard);
 router.get('/battle-history', authenticateToken, userController.handleGetBattleHistory);
+router.get('/match/:id', authenticateToken, userController.handleGetMatchDetail);
 
 module.exports = router;

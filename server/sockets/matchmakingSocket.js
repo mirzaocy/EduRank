@@ -14,7 +14,8 @@ const {
 } = require('../services/anticheat');
 const {
     getRandomQuestions,
-    checkAnswer
+    checkAnswer,
+    getQuestionData
 } = require('../models/questions');
 const {
     waitingPlayers,
@@ -258,14 +259,68 @@ function initSockets(io) {
                     userModel.updateUserStats(room[winner].id, room.eloSubject, true, winnerELO.newTotal);
                     userModel.updateUserStats(room[loser].id, room.eloSubject, false, loserELO.newTotal);
 
-                    io.to(room[winner].socketId).emit('matchFinished', {
-                        isWin: true,
-                        score: room[winner].score,
-                        oppScore: room[loser].score,
-                        eloChange: winnerELO.gained,
-                        newElo: winnerELO.newTotal,
-                        timeTaken: room[winner].timeTaken
+                    const createdAt = new Date().toISOString();
+                    // Persist winner history with details
+                    const winnerDetails = (room[winner].answers || []).map((a) => {
+                        const qd = getQuestionData(a.questionId) || {};
+                        return {
+                            questionId: a.questionId,
+                            question: qd.q || null,
+                            options: qd.options || null,
+                            correctAnswer: qd.answer !== undefined ? qd.answer : null,
+                            yourAnswer: a.answerIndex,
+                            isCorrect: !!a.isCorrect,
+                            flagged: !!a.flagged
+                        };
                     });
+
+                    userModel.recordMatchHistory({
+                        userId: room[winner].id,
+                        opponentName: room[loser].name,
+                        subject: room.subject,
+                        mode: room.mode,
+                        isWin: true,
+                        eloChange: winnerELO.gained,
+                        createdAt,
+                        durationSeconds: Math.floor(room[winner].timeTaken || 0),
+                        details: winnerDetails
+                    }, (err, winnerMatchId) => {
+                        io.to(room[winner].socketId).emit('matchFinished', {
+                            isWin: true,
+                            score: room[winner].score,
+                            oppScore: room[loser].score,
+                            eloChange: winnerELO.gained,
+                            newElo: winnerELO.newTotal,
+                            timeTaken: room[winner].timeTaken,
+                            matchId: winnerMatchId || null
+                        });
+                    });
+
+                    // Persist loser history (no emit — client disconnected)
+                    const loserDetails = (room[loser].answers || []).map((a) => {
+                        const qd = getQuestionData(a.questionId) || {};
+                        return {
+                            questionId: a.questionId,
+                            question: qd.q || null,
+                            options: qd.options || null,
+                            correctAnswer: qd.answer !== undefined ? qd.answer : null,
+                            yourAnswer: a.answerIndex,
+                            isCorrect: !!a.isCorrect,
+                            flagged: !!a.flagged
+                        };
+                    });
+
+                    userModel.recordMatchHistory({
+                        userId: room[loser].id,
+                        opponentName: room[winner].name,
+                        subject: room.subject,
+                        mode: room.mode,
+                        isWin: false,
+                        eloChange: loserELO.gained,
+                        createdAt,
+                        durationSeconds: Math.floor(room[loser].timeTaken || 0),
+                        details: loserDetails
+                    }, () => {});
 
                     if (room.matchTimeout) clearTimeout(room.matchTimeout);
                     delete activeRooms[roomId];
@@ -326,25 +381,22 @@ function initSockets(io) {
         userModel.updateUserStats(room.p1.id, room.eloSubject, p1Win, p1ELO.newTotal);
         userModel.updateUserStats(room.p2.id, room.eloSubject, p2Win, p2ELO.newTotal);
 
-        io.to(room.p1.socketId).emit('matchFinished', {
-            isWin: p1Win,
-            score: room.p1.score,
-            oppScore: room.p2.score,
-            eloChange: p1ELO.gained,
-            newElo: p1ELO.newTotal,
-            timeTaken: room.p1.timeTaken
-        });
-
-        io.to(room.p2.socketId).emit('matchFinished', {
-            isWin: p2Win,
-            score: room.p2.score,
-            oppScore: room.p1.score,
-            eloChange: p2ELO.gained,
-            newElo: p2ELO.newTotal,
-            timeTaken: room.p2.timeTaken
-        });
-
+        // Persist histories and emit finish payloads including matchId when available
         const createdAt = new Date().toISOString();
+
+        const p1Details = (room.p1.answers || []).map((a) => {
+            const qd = getQuestionData(a.questionId) || {};
+            return {
+                questionId: a.questionId,
+                question: qd.q || null,
+                options: qd.options || null,
+                correctAnswer: qd.answer !== undefined ? qd.answer : null,
+                yourAnswer: a.answerIndex,
+                isCorrect: !!a.isCorrect,
+                flagged: !!a.flagged
+            };
+        });
+
         userModel.recordMatchHistory({
             userId: room.p1.id,
             opponentName: room.p2.name,
@@ -352,7 +404,32 @@ function initSockets(io) {
             mode: room.mode,
             isWin: p1Win === true,
             eloChange: p1ELO.gained,
-            createdAt
+            createdAt,
+            durationSeconds: Math.floor(room.p1.timeTaken || 0),
+            details: p1Details
+        }, (err, p1MatchId) => {
+            io.to(room.p1.socketId).emit('matchFinished', {
+                isWin: p1Win,
+                score: room.p1.score,
+                oppScore: room.p2.score,
+                eloChange: p1ELO.gained,
+                newElo: p1ELO.newTotal,
+                timeTaken: room.p1.timeTaken,
+                matchId: p1MatchId || null
+            });
+        });
+
+        const p2Details = (room.p2.answers || []).map((a) => {
+            const qd = getQuestionData(a.questionId) || {};
+            return {
+                questionId: a.questionId,
+                question: qd.q || null,
+                options: qd.options || null,
+                correctAnswer: qd.answer !== undefined ? qd.answer : null,
+                yourAnswer: a.answerIndex,
+                isCorrect: !!a.isCorrect,
+                flagged: !!a.flagged
+            };
         });
 
         userModel.recordMatchHistory({
@@ -362,7 +439,19 @@ function initSockets(io) {
             mode: room.mode,
             isWin: p2Win === true,
             eloChange: p2ELO.gained,
-            createdAt
+            createdAt,
+            durationSeconds: Math.floor(room.p2.timeTaken || 0),
+            details: p2Details
+        }, (err, p2MatchId) => {
+            io.to(room.p2.socketId).emit('matchFinished', {
+                isWin: p2Win,
+                score: room.p2.score,
+                oppScore: room.p1.score,
+                eloChange: p2ELO.gained,
+                newElo: p2ELO.newTotal,
+                timeTaken: room.p2.timeTaken,
+                matchId: p2MatchId || null
+            });
         });
 
         delete activeRooms[roomId];

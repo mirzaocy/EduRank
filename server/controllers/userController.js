@@ -36,6 +36,12 @@ async function handleGetBattleHistory(req, res) {
     return sendServiceResult(res, result);
 }
 
+async function handleGetMatchDetail(req, res) {
+    const matchId = req.params.id;
+    const result = await userService.getMatchDetail(req.user.id, matchId);
+    return sendServiceResult(res, result);
+}
+
 module.exports = {
     handleGetProfile,
     handleUpdateProfile,
@@ -43,5 +49,6 @@ module.exports = {
     handleAddFriend,
     handleDeleteFriend,
     handleGetLeaderboard,
-    handleGetBattleHistory
+    handleGetBattleHistory,
+    handleGetMatchDetail
 };

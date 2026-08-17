@@ -219,5 +219,83 @@
     }
     
   </script>
+    <script>
+        (function(){
+            const matchId = localStorage.getItem('matchId');
+            const token = localStorage.getItem('edurank_token');
+            const labels = ['A','B','C','D'];
+            if(matchId && token && gameMode !== 'ai') {
+                // fetch match details
+                fetch(`/api/match/${matchId}`, {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                }).then(r => r.json()).then(payload => {
+                    if(!payload || payload.error) {
+                        // fallback
+                        return;
+                    }
+                    const data = payload.data || payload;
+                    if(!data) return;
+                    const details = data.details || null;
+                    if(!details || !Array.isArray(details) || details.length === 0) {
+                        reviewList.innerHTML = '<p style="text-align:center; padding:20px;">Detailed answer review is unavailable for this match.</p>';
+                        return;
+                    }
+
+                    // Summary: if available override display
+                    if(data.elo_change !== undefined) {
+                        document.getElementById('resPts').innerText = `${data.is_win ? '+' : ''}${data.elo_change} ELO`;
+                    }
+
+                    // Render questions
+                    reviewList.innerHTML = '<h4 style="margin-bottom:12px;">📋 Review Jawaban</h4>' + details.map((d, i) => {
+                        const isCorrect = !!d.isCorrect;
+                        const your = (d.yourAnswer !== null && d.yourAnswer !== undefined) ? (labels[d.yourAnswer] + '. ' + (d.options && d.options[d.yourAnswer] ? d.options[d.yourAnswer] : '')) : 'Tidak dijawab';
+                        const correct = (d.correctAnswer !== null && d.correctAnswer !== undefined) ? (labels[d.correctAnswer] + '. ' + (d.options && d.options[d.correctAnswer] ? d.options[d.correctAnswer] : '')) : '-';
+                        const topicLink = `materi.html?subject=${encodeURIComponent((data.subject||'').toLowerCase())}`;
+                        return `
+                            <div class="review-answer-card ${isCorrect ? 'correct' : 'wrong'}">
+                                <p style="font-weight:600; margin-bottom:6px;">Soal ${i+1}: ${d.question || 'Soal tidak tersedia'}</p>
+                                <span>Jawabanmu: <strong>${your}</strong> ${isCorrect ? '✅' : '❌'}</span><br>
+                                <span>Kunci: <strong>${correct}</strong></span><br>
+                                <div style="margin-top:8px; display:flex; gap:8px;">
+                                    <button class="secondary-btn" onclick="window.location.href='${topicLink}'">LEARN THIS TOPIC</button>
+                                </div>
+                            </div>`;
+                    }).join('');
+
+                    // Add Review Mistakes button if there are wrong answers
+                    const wrongCount = details.filter(d => !d.isCorrect).length;
+                    if(wrongCount > 0) {
+                        const btn = document.createElement('button');
+                        btn.className = 'primary-btn';
+                        btn.style.marginTop = '8px';
+                        btn.innerText = `${wrongCount} QUESTIONS NEED REVIEW`;
+                        btn.onclick = () => {
+                            // filter to wrong only
+                            reviewList.innerHTML = '<h4 style="margin-bottom:12px;">🔎 Review Kesalahan</h4>' + details.filter(d => !d.isCorrect).map((d, i) => {
+                                const isCorrect = !!d.isCorrect;
+                                const your = (d.yourAnswer !== null && d.yourAnswer !== undefined) ? (labels[d.yourAnswer] + '. ' + (d.options && d.options[d.yourAnswer] ? d.options[d.yourAnswer] : '')) : 'Tidak dijawab';
+                                const correct = (d.correctAnswer !== null && d.correctAnswer !== undefined) ? (labels[d.correctAnswer] + '. ' + (d.options && d.options[d.correctAnswer] ? d.options[d.correctAnswer] : '')) : '-';
+                                const topicLink = `materi.html?subject=${encodeURIComponent((data.subject||'').toLowerCase())}`;
+                                return `
+                                    <div class="review-answer-card wrong">
+                                        <p style="font-weight:600; margin-bottom:6px;">Soal: ${d.question || 'Soal tidak tersedia'}</p>
+                                        <span>Jawabanmu: <strong>${your}</strong></span><br>
+                                        <span>Kunci: <strong>${correct}</strong></span><br>
+                                        <p style="margin-top:8px;">Explanation: Tidak tersedia.</p>
+                                        <div style="margin-top:8px; display:flex; gap:8px;">
+                                            <button class="secondary-btn" onclick="window.location.href='${topicLink}'">LEARN THIS TOPIC</button>
+                                        </div>
+                                    </div>`;
+                            }).join('');
+                        };
+                        reviewList.parentNode.insertBefore(btn, reviewList.nextSibling);
+                    }
+                }).catch(() => {
+                    // ignore and fallback to localStorage summary
+                });
+            }
+        })();
+    </script>
 </body>
 </html>
