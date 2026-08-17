@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Notifications - EduRank</title>
+  <script>document.documentElement.classList.add(localStorage.getItem("theme") === "light" ? "light" : "dark");</script>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="/css/style.css" />
+  <style>
+    .notifications-page { padding: 40px 5%; min-height: 80vh; }
+    .notif-item { display:flex; gap:12px; padding:12px; border-radius:10px; border:1px solid var(--border); background:var(--surface-2); align-items:flex-start; }
+    .notif-item.unread { background: linear-gradient(90deg, rgba(255,245,157,0.06), rgba(255,255,255,0.02)); }
+    .notif-meta { color:var(--text-light); font-size:0.85rem; }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <nav class="navbar container">
+      <a href="index.html?view=main#home" class="nav-logo" style="text-decoration:none;"><i class="fa-solid fa-graduation-cap"></i><span>EduRank</span></a>
+      <div class="nav-actions">
+        <a href="profile.html" class="profile-btn"><img src="https://i.pravatar.cc/100?img=12" alt="Profile" id="navProfileImg" /></a>
+      </div>
+    </nav>
+  </header>
+
+  <main class="notifications-page container">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <h2>Notifications</h2>
+      <div>
+        <button class="secondary-btn" id="markAllReadBtn">MARK ALL AS READ</button>
+      </div>
+    </div>
+
+    <div id="notifList">
+      <p style="color:var(--text-light);">Loading...</p>
+    </div>
+  </main>
+
+  <script src="/js/components/interaksi.js"></script>
+  <script>
+    async function loadNotifications() {
+      const token = localStorage.getItem('edurank_token');
+      const list = document.getElementById('notifList');
+      if(!token) { list.innerHTML = '<p>Please log in to see notifications.</p>'; return; }
+      try {
+        const res = await fetch('/api/notifications?limit=50', { headers: { 'Authorization': 'Bearer ' + token } });
+        if (!res.ok) { list.innerHTML = '<p>Unable to load notifications.</p>'; return; }
+        const rows = await res.json();
+        if (!rows || rows.length === 0) { list.innerHTML = '<p>You\'re all caught up.</p>'; return; }
+        list.innerHTML = rows.map(r => `
+          <div class="notif-item ${r.is_read ? '' : 'unread'}">
+            <div style="width:44px; height:44px; border-radius:50%; background:var(--surface); display:flex; align-items:center; justify-content:center;">
+              <i class="fa-solid fa-bell"></i>
+            </div>
+            <div style="flex:1">
+              <div style="font-weight:600;">${r.title || r.type}</div>
+              <div class="notif-meta">${r.message || ''} • <small>${new Date(r.created_at).toLocaleString()}</small></div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <button class="secondary-btn" onclick="markRead(${r.id})">Mark Read</button>
+            </div>
+          </div>`).join('');
+      } catch (e) { list.innerHTML = '<p>Unable to load notifications.</p>'; }
+    }
+
+    async function markRead(id) {
+      const token = localStorage.getItem('edurank_token');
+      if (!token) return;
+      await fetch('/api/notifications/' + id + '/read', { method: 'PATCH', headers: { 'Authorization': 'Bearer ' + token } });
+      await loadNotifications();
+      // update global badge
+      if (window.fetchUnreadCount) window.fetchUnreadCount();
+    }
+
+    document.getElementById('markAllReadBtn').addEventListener('click', async () => {
+      const token = localStorage.getItem('edurank_token');
+      if (!token) return;
+      await fetch('/api/notifications/read-all', { method: 'PATCH', headers: { 'Authorization': 'Bearer ' + token } });
+      await loadNotifications();
+      if (window.fetchUnreadCount) window.fetchUnreadCount();
+    });
+
+    document.addEventListener('DOMContentLoaded', loadNotifications);
+  </script>
+</body>
+</html>

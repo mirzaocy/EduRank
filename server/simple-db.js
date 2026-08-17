@@ -253,6 +253,20 @@ function run(query, params = [], callback) {
       changes = initialLength - data.friends.length;
     }
   }
+  else if (sql.startsWith('UPDATE users SET') && sql.includes('status')) {
+    // crude parser: params expected [..., status, id] or [status, id]
+    const status = params[0] || params[1] || 'Offline';
+    const id = params[params.length - 1] || params[1] || null;
+    if (id) {
+      const idx = data.users.findIndex(u => u && u.id === Number(id));
+      if (idx !== -1) {
+        data.users[idx].status = String(status);
+        data.users[idx].updated_at = new Date().toISOString();
+        writeDb(data);
+        changes = 1;
+      }
+    }
+  }
 
   const ctx = { lastID, changes };
   if (callback) callback.call(ctx, null, { lastID, insertId: lastID, changes, affectedRows: changes });

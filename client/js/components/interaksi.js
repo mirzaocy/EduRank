@@ -1075,6 +1075,56 @@ function createToast(message){
 }
 
 // ===============================
+// NOTIFICATION BELL (inject into header)
+// ===============================
+function updateNotificationBadge(count) {
+    const badge = document.getElementById('notificationBadge');
+    if (!badge) return;
+    if (!count || Number(count) === 0) {
+        badge.style.display = 'none';
+        badge.innerText = '';
+    } else {
+        badge.style.display = 'inline-block';
+        badge.innerText = String(count);
+    }
+}
+
+async function fetchUnreadCount() {
+    try {
+        const token = localStorage.getItem('edurank_token');
+        if (!token) return updateNotificationBadge(0);
+        const res = await fetch('/api/notifications/unread-count', { headers: { 'Authorization': 'Bearer ' + token } });
+        if (!res.ok) return;
+        const payload = await res.json();
+        if (payload && typeof payload.unread !== 'undefined') updateNotificationBadge(payload.unread);
+    } catch (e) { /* ignore */ }
+}
+
+function renderNotificationBell() {
+    try {
+        const container = document.querySelector('.nav-actions');
+        if (!container) return;
+        if (document.getElementById('notificationBell')) return;
+
+        const btn = document.createElement('button');
+        btn.className = 'nav-icon-btn';
+        btn.id = 'notificationBell';
+        btn.title = 'Notifications';
+        btn.innerHTML = `<i class="fa-solid fa-bell"></i><span id="notificationBadge" style="display:none; position:relative; top:-10px; left:-8px; background:var(--danger); color:white; font-size:11px; padding:2px 6px; border-radius:999px;"></span>`;
+        btn.onclick = () => { window.location.href = 'notifications.html'; };
+        container.insertBefore(btn, container.firstChild);
+        // initial fetch
+        fetchUnreadCount();
+        // update on focus
+        window.addEventListener('focus', fetchUnreadCount);
+    } catch (e) { console.error(e); }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    renderNotificationBell();
+});
+
+// ===============================
 // SAVE PROFILE
 // ===============================
 

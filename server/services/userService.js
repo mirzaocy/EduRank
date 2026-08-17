@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const userModel = require('../models/userModel');
+const presenceService = require('./presenceService');
 const { getJwtSecret } = require('../config/serverConfig');
 
 function getProfile(userId) {
@@ -45,7 +46,12 @@ function getFriends(userId) {
     return new Promise((resolve) => {
         userModel.getFriendsList(userId, (err, rows) => {
             if (err) return resolve({ status: 500, error: "Database error" });
-            resolve({ status: 200, data: rows || [] });
+            // enrich with presence status if available
+            const enriched = (rows || []).map(r => {
+                const status = presenceService.getStatus(r.friend_user_id || r.id || r.friend_id) || r.status || 'Offline';
+                return ({ ...r, status });
+            });
+            resolve({ status: 200, data: enriched });
         });
     });
 }

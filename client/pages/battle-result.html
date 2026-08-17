@@ -109,6 +109,7 @@
 
   <main class="result-section">
     <div class="result-card">
+        <div id="levelUpBanner" style="display:none; margin-bottom:12px; padding:12px; border-radius:8px; background: linear-gradient(90deg,#fef3c7,#ecfccb); font-weight:700; color:#92400e;"></div>
         <div class="result-status" id="resStatus">VICTORY!</div>
         <div class="elo-gain" id="resPts">+45 Pts | +120 ELO</div>
         
@@ -217,7 +218,32 @@
             reviewList.innerHTML = '<p style="text-align:center; padding: 20px;">Review jawaban detail dinonaktifkan di mode online.</p>';
         }
     }
-    
+        // Check profile for level-up (server authoritative)
+        function getAccountLevel(exp) {
+            const level = Math.max(1, Math.floor(exp / 120) + 1);
+            const current = exp % 120;
+            return { level, current, next:120, percent:(current / 120) * 100 };
+        }
+
+        (function checkLevelUp(){
+            const token = localStorage.getItem('edurank_token');
+            if(!token) return;
+            fetch('/api/profile', { headers: { 'Authorization': 'Bearer ' + token } }).then(r => r.json()).then(payload => {
+                if(!payload || payload.error) return;
+                const profile = payload.data || payload;
+                const prevExp = Number(localStorage.getItem('exp') || 0);
+                const prevLevel = getAccountLevel(prevExp).level;
+                const newLevel = getAccountLevel(Number(profile.exp || 0)).level;
+                if(newLevel > prevLevel) {
+                    const banner = document.getElementById('levelUpBanner');
+                    banner.innerText = `LEVEL UP! ${prevLevel} → ${newLevel} — Congratulations!`;
+                    banner.style.display = 'block';
+                    // Update stored exp
+                    localStorage.setItem('exp', String(profile.exp || 0));
+                    localStorage.setItem('level', String(newLevel));
+                }
+            }).catch(()=>{});
+        })();
   </script>
     <script>
         (function(){

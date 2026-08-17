@@ -239,6 +239,178 @@ function initDb() {
         }
     });
 
+    const createAchievementsTable = `
+        CREATE TABLE IF NOT EXISTS achievements (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            key_name VARCHAR(100) NOT NULL UNIQUE,
+            name VARCHAR(255) NOT NULL,
+            description TEXT DEFAULT NULL,
+            icon VARCHAR(255) DEFAULT NULL,
+            category VARCHAR(100) DEFAULT NULL,
+            requirement_type VARCHAR(100) DEFAULT NULL,
+            requirement_value INT DEFAULT 0,
+            reward_exp INT DEFAULT 0,
+            is_active TINYINT DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `;
+
+    const createUserAchievementsTable = `
+        CREATE TABLE IF NOT EXISTS user_achievements (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            achievement_id INT NOT NULL,
+            progress INT DEFAULT 0,
+            unlocked_at TIMESTAMP NULL DEFAULT NULL,
+            UNIQUE KEY uq_user_achievement (user_id, achievement_id),
+            INDEX idx_user_achievements_user_id (user_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `;
+
+    pool.query(createAchievementsTable, (err) => {
+        if (err) console.error('[MYSQL-ERROR] Gagal membuat/memverifikasi tabel achievements:', err.message);
+        else console.log('[MYSQL] Tabel "achievements" terverifikasi/dibuat.');
+    });
+
+    pool.query(createUserAchievementsTable, (err) => {
+        if (err) console.error('[MYSQL-ERROR] Gagal membuat/memverifikasi tabel user_achievements:', err.message);
+        else console.log('[MYSQL] Tabel "user_achievements" terverifikasi/dibuat.');
+    });
+
+    const createNotificationsTable = `
+        CREATE TABLE IF NOT EXISTS notifications (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            recipient_id INT NOT NULL,
+            type VARCHAR(100) NOT NULL,
+            title VARCHAR(255) DEFAULT NULL,
+            message TEXT DEFAULT NULL,
+            actor_id INT DEFAULT NULL,
+            entity_type VARCHAR(100) DEFAULT NULL,
+            entity_id INT DEFAULT NULL,
+            payload JSON DEFAULT NULL,
+            is_read TINYINT(1) DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_notifications_recipient (recipient_id),
+            INDEX idx_notifications_read (recipient_id, is_read)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `;
+
+    const createActivityTable = `
+        CREATE TABLE IF NOT EXISTS activity (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            actor_id INT NOT NULL,
+            verb VARCHAR(100) NOT NULL,
+            object_type VARCHAR(100) DEFAULT NULL,
+            object_id INT DEFAULT NULL,
+            metadata JSON DEFAULT NULL,
+            visibility VARCHAR(50) DEFAULT 'friends',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_activity_created (created_at),
+            INDEX idx_activity_actor (actor_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `;
+
+    const createTournamentsTable = `
+        CREATE TABLE IF NOT EXISTS tournaments (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            key_name VARCHAR(100) NOT NULL UNIQUE,
+            name VARCHAR(255) NOT NULL,
+            subject VARCHAR(100) DEFAULT 'all',
+            description TEXT DEFAULT NULL,
+            format VARCHAR(50) DEFAULT 'single_elimination',
+            max_participants INT DEFAULT 16,
+            slots_taken INT DEFAULT 0,
+            registration_open_at TIMESTAMP NULL DEFAULT NULL,
+            registration_close_at TIMESTAMP NULL DEFAULT NULL,
+            start_at TIMESTAMP NULL DEFAULT NULL,
+            status VARCHAR(50) DEFAULT 'draft',
+            seed BIGINT DEFAULT NULL,
+            bracket_snapshot JSON DEFAULT NULL,
+            reward_json JSON DEFAULT NULL,
+            rules_json JSON DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_tournaments_status (status),
+            INDEX idx_tournaments_start_at (start_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `;
+
+    const createTournamentParticipantsTable = `
+        CREATE TABLE IF NOT EXISTS tournament_participants (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            tournament_id INT NOT NULL,
+            user_id INT NOT NULL,
+            registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_tournament_user (tournament_id, user_id),
+            INDEX idx_tp_tournament (tournament_id),
+            INDEX idx_tp_user (user_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `;
+
+    const createTournamentMatchesTable = `
+        CREATE TABLE IF NOT EXISTS tournament_matches (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            tournament_id INT NOT NULL,
+            round INT NOT NULL,
+            match_index INT NOT NULL,
+            player_a_id INT DEFAULT NULL,
+            player_b_id INT DEFAULT NULL,
+            status VARCHAR(50) DEFAULT 'pending',
+            battle_id INT DEFAULT NULL,
+            winner_id INT DEFAULT NULL,
+            scheduled_at TIMESTAMP NULL DEFAULT NULL,
+            started_at TIMESTAMP NULL DEFAULT NULL,
+            finished_at TIMESTAMP NULL DEFAULT NULL,
+            UNIQUE KEY uq_tournament_match (tournament_id, round, match_index),
+            INDEX idx_tm_tournament (tournament_id),
+            INDEX idx_tm_player_a (player_a_id),
+            INDEX idx_tm_player_b (player_b_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `;
+
+    const createTournamentRewardLog = `
+        CREATE TABLE IF NOT EXISTS tournament_reward_log (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            tournament_id INT NOT NULL,
+            user_id INT NOT NULL,
+            reward_type VARCHAR(100) NOT NULL,
+            payload JSON DEFAULT NULL,
+            awarded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_tournament_reward (tournament_id, user_id, reward_type),
+            INDEX idx_trl_tournament (tournament_id),
+            INDEX idx_trl_user (user_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `;
+
+    pool.query(createNotificationsTable, (err) => {
+        if (err) console.error('[MYSQL-ERROR] Gagal membuat/memverifikasi tabel notifications:', err.message);
+        else console.log('[MYSQL] Tabel "notifications" terverifikasi/dibuat.');
+    });
+
+    pool.query(createActivityTable, (err) => {
+        if (err) console.error('[MYSQL-ERROR] Gagal membuat/memverifikasi tabel activity:', err.message);
+        else console.log('[MYSQL] Tabel "activity" terverifikasi/dibuat.');
+    });
+
+    pool.query(createTournamentsTable, (err) => {
+        if (err) console.error('[MYSQL-ERROR] Gagal membuat/memverifikasi tabel tournaments:', err.message);
+        else console.log('[MYSQL] Tabel "tournaments" terverifikasi/dibuat.');
+    });
+
+    pool.query(createTournamentParticipantsTable, (err) => {
+        if (err) console.error('[MYSQL-ERROR] Gagal membuat/memverifikasi tabel tournament_participants:', err.message);
+        else console.log('[MYSQL] Tabel "tournament_participants" terverifikasi/dibuat.');
+    });
+
+    pool.query(createTournamentMatchesTable, (err) => {
+        if (err) console.error('[MYSQL-ERROR] Gagal membuat/memverifikasi tabel tournament_matches:', err.message);
+        else console.log('[MYSQL] Tabel "tournament_matches" terverifikasi/dibuat.');
+    });
+
+    pool.query(createTournamentRewardLog, (err) => {
+        if (err) console.error('[MYSQL-ERROR] Gagal membuat/memverifikasi tabel tournament_reward_log:', err.message);
+        else console.log('[MYSQL] Tabel "tournament_reward_log" terverifikasi/dibuat.');
+    });
+
     // Lightweight migrations for older databases that may miss new columns.
     const usersColumns = [
         ['username', "ALTER TABLE users ADD COLUMN username VARCHAR(255) DEFAULT '-'"],

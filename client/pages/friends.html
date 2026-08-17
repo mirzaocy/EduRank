@@ -211,5 +211,45 @@
     </div>
   </footer>
   <script src="/js/components/interaksi.js"></script>
+  <script>
+    // fetch friends and update presence indicators
+    async function loadFriends() {
+      try {
+        const res = await fetch('/api/friends', { credentials: 'include' });
+        if (!res.ok) return;
+        const data = await res.json();
+        const list = document.querySelector('.friend-list');
+        if (!list) return;
+        list.innerHTML = '';
+        (data || []).forEach(f => {
+          const item = document.createElement('div');
+          item.className = 'friend-item';
+          const statusClass = (f.status || 'Offline') === 'Online' ? 'online' : 'offline';
+          item.innerHTML = `
+            <div class="friend-info">
+              <img src="${f.avatar || 'https://i.pravatar.cc/100?img=12'}" alt="">
+              <div>
+                <div style="font-weight:600;">${f.name}</div>
+                <div style="font-size:0.8rem; color:var(--text-light);"><span class="status-dot ${statusClass}"></span>${f.status || 'Offline'}</div>
+              </div>
+            </div>
+            <div>
+              <button class="primary-btn" style="padding:8px 15px;" onclick="challengeFriend(${f.id})">Invite</button>
+            </div>
+          `;
+          list.appendChild(item);
+        });
+      } catch (e) { console.error(e); }
+    }
+
+    function challengeFriend(friendId) {
+      showCustomAlert('Permintaan tantangan dikirim!', 'success');
+      // TODO: emit socket event to challenge friend
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadFriends();
+    });
+  </script>
 </body>
 </html>

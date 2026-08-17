@@ -5,6 +5,7 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const router = require('./routes');
 const db = require('./config');
+const achievementService = require('./services/achievementService');
 const { initSockets } = require('./sockets/matchmakingSocket');
 const { resolveServerConfig } = require('./config/serverConfig');
 const { authenticateToken, requireAdmin } = require('./middlewares/authMiddleware');
@@ -140,6 +141,8 @@ function shutdown(signal) {
 
 if (require.main === module) {
     startServer(process.env);
+    // Seed achievement definitions into DB (idempotent)
+    try { achievementService.ensureDefinitionsSeeded(); } catch (e) { /* ignore */ }
     process.once('SIGTERM', () => shutdown('SIGTERM'));
     process.once('SIGINT', () => shutdown('SIGINT'));
 }

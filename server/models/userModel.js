@@ -232,6 +232,10 @@ function adminDeleteUser(id, callback) {
     db.run(`DELETE FROM users WHERE id = ?`, [Number(id)], callback);
 }
 
+function setUserStatus(userId, status, callback) {
+    db.run(`UPDATE users SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [String(status || 'Offline'), Number(userId)], callback);
+}
+
 module.exports = {
     findUserByEmail,
     findUserById,
@@ -254,5 +258,6 @@ module.exports = {
     countAdminUsers,
     adminUpdateUser,
     adminBanUser,
-    adminDeleteUser
+    adminDeleteUser,
+    setUserStatus
 };

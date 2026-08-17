@@ -17,6 +17,9 @@ const {
     checkAnswer,
     getQuestionData
 } = require('../models/questions');
+const achievementService = require('../services/achievementService');
+const presenceService = require('../services/presenceService');
+const notificationService = require('../services/notificationService');
 const {
     waitingPlayers,
     activeRooms,
@@ -61,6 +64,65 @@ function initSockets(io) {
             }
             next();
         });
+
+        // mark online presence
+        presenceService.setOnline(socket.user.id, socket.id);
+        // notify friends (if any) — we will emit a generic presence update on connect
+        socket.emit('presence:ready', { status: presenceService.getStatus(socket.user.id) });
+
+        // friend challenge flows
+        socket.on('friend:challenge', async (payload = {}) => {
+            const { friendId, subject } = payload || {};
+            const fid = Number(friendId);
+            if (!Number.isInteger(fid) || fid <= 0) return socket.emit('friend:challengeError', { reason: 'INVALID_FRIEND_ID' });
+
+            // ensure they are friends
+            userModel.checkFriendshipExists(socket.user.id, fid, (err, exists) => {
+                if (err) return socket.emit('friend:challengeError', { reason: 'DB_ERROR' });
+                if (!exists) return socket.emit('friend:challengeError', { reason: 'NOT_FRIENDS' });
+
+                const status = presenceService.getStatus(fid);
+                if (status !== 'Online') return socket.emit('friend:challengeError', { reason: 'FRIEND_OFFLINE' });
+
+                // fetch friend's sockets and emit
+                const presEntry = presenceService.presence.get(String(fid)) || presenceService.presence.get(Number(fid));
+                if (!presEntry || !presEntry.sockets || presEntry.sockets.size === 0) {
+                    return socket.emit('friend:challengeError', { reason: 'FRIEND_NOT_AVAILABLE' });
+                }
+
+                const challengeId = 'ch_' + Math.random().toString(36).substr(2, 9);
+                const payloadToFriend = { from: { id: socket.user.id, name: socket.user.nama || socket.user.name || socket.user.email }, subject, challengeId };
+                for (const sid of presEntry.sockets) {
+                    const targetSock = io.sockets.sockets.get(sid);
+                    if (targetSock) targetSock.emit('friend:challengeReceived', payloadToFriend);
+                }
+
+                // notify challenger that request was sent
+                socket.emit('friend:challengeSent', { challengeId });
+            });
+        });
+
+        socket.on('friend:challengeResponse', (payload = {}) => {
+            const { challengeId, fromId, accepted, roomCode } = payload || {};
+            const fid = Number(fromId);
+            if (!challengeId || !Number.isInteger(fid) || fid <= 0) return;
+
+            // send response back to challenger
+            const presEntry = presenceService.presence.get(String(fid)) || presenceService.presence.get(Number(fid));
+            if (!presEntry || !presEntry.sockets || presEntry.sockets.size === 0) {
+                return socket.emit('friend:challengeResponseError', { reason: 'CHALLENGER_NOT_AVAILABLE' });
+            }
+
+            const responsePayload = { challengeId, from: { id: socket.user.id, name: socket.user.nama || socket.user.name || socket.user.email }, accepted, roomCode: roomCode || null };
+            for (const sid of presEntry.sockets) {
+                const targetSock = io.sockets.sockets.get(sid);
+                if (targetSock) targetSock.emit('friend:challengeResponse', responsePayload);
+            }
+
+            // If accepted, also notify responder so client can join matchmaking with provided roomCode
+            socket.emit('friend:challengeFinalized', { challengeId, accepted, roomCode: roomCode || null });
+        });
+
 
         socket.on('joinMatchmaking', (payload) => {
             const validation = validateMatchPayload(payload);
@@ -285,14 +347,40 @@ function initSockets(io) {
                         durationSeconds: Math.floor(room[winner].timeTaken || 0),
                         details: winnerDetails
                     }, (err, winnerMatchId) => {
-                        io.to(room[winner].socketId).emit('matchFinished', {
-                            isWin: true,
-                            score: room[winner].score,
-                            oppScore: room[loser].score,
-                            eloChange: winnerELO.gained,
-                            newElo: winnerELO.newTotal,
-                            timeTaken: room[winner].timeTaken,
-                            matchId: winnerMatchId || null
+                        // evaluate achievements and progression for winner
+                        const matchRow = { isWin: true, details: winnerDetails, subject: room.subject, mode: room.mode };
+                        achievementService.evaluateForMatch(room[winner].id, matchRow, () => {
+                          // after evaluation, check level-up and emit if needed
+                          userModel.getUserProfile(room[winner].id, (getErr, prof) => {
+                              // emit updated progress if needed
+                              io.to(room[winner].socketId).emit('matchFinished', {
+                                  isWin: true,
+                                  score: room[winner].score,
+                                  oppScore: room[loser].score,
+                                  eloChange: winnerELO.gained,
+                                  newElo: winnerELO.newTotal,
+                                  timeTaken: room[winner].timeTaken,
+                                  matchId: winnerMatchId || null,
+                                  profile: prof || null
+                              });
+                              // create persistent notification
+                              try {
+                                  notificationService.createNotification({
+                                      recipientId: room[winner].id,
+                                      type: 'BATTLE_VICTORY',
+                                      title: 'You won a battle!',
+                                      message: `You won against ${room[loser].name}`,
+                                      actorId: room[winner].id,
+                                      entityType: 'match',
+                                      entityId: winnerMatchId || null,
+                                      payload: { score: room[winner].score }
+                                  }, (nErr, nid) => {
+                                      if (!nErr && nid) {
+                                          io.to(room[winner].socketId).emit('notification:new', { id: nid, type: 'BATTLE_VICTORY', title: 'You won a battle!', message: `You won against ${room[loser].name}` });
+                                      }
+                                  });
+                              } catch (e) { /* ignore */ }
+                          });
                         });
                     });
 
@@ -320,7 +408,22 @@ function initSockets(io) {
                         createdAt,
                         durationSeconds: Math.floor(room[loser].timeTaken || 0),
                         details: loserDetails
-                    }, () => {});
+                    }, (err) => {
+                        const matchRowLoser = { isWin: false, details: loserDetails, subject: room.subject, mode: room.mode };
+                        achievementService.evaluateForMatch(room[loser].id, matchRowLoser, () => {});
+                    });
+                                try {
+                                    notificationService.createNotification({
+                                        recipientId: room[loser].id,
+                                        type: 'BATTLE_DEFEAT',
+                                        title: 'You lost a battle',
+                                        message: `You lost against ${room[winner].name}`,
+                                        actorId: room[loser].id,
+                                        entityType: 'match',
+                                        entityId: null,
+                                        payload: { score: room[loser].score }
+                                    }, () => {});
+                                } catch (e) {}
 
                     if (room.matchTimeout) clearTimeout(room.matchTimeout);
                     delete activeRooms[roomId];
@@ -328,6 +431,11 @@ function initSockets(io) {
                 }
             }
 
+            // update presence
+            const uid = presenceService.setOfflineBySocket(socket.id);
+            if (uid) {
+                // notify others if needed
+            }
             cleanupSocket(socket.id);
         });
     });
@@ -408,14 +516,34 @@ function initSockets(io) {
             durationSeconds: Math.floor(room.p1.timeTaken || 0),
             details: p1Details
         }, (err, p1MatchId) => {
-            io.to(room.p1.socketId).emit('matchFinished', {
-                isWin: p1Win,
-                score: room.p1.score,
-                oppScore: room.p2.score,
-                eloChange: p1ELO.gained,
-                newElo: p1ELO.newTotal,
-                timeTaken: room.p1.timeTaken,
-                matchId: p1MatchId || null
+            const matchRow1 = { isWin: p1Win, details: p1Details, subject: room.subject, mode: room.mode };
+            achievementService.evaluateForMatch(room.p1.id, matchRow1, () => {
+                userModel.getUserProfile(room.p1.id, (getErr, prof) => {
+                    io.to(room.p1.socketId).emit('matchFinished', {
+                        isWin: p1Win,
+                        score: room.p1.score,
+                        oppScore: room.p2.score,
+                        eloChange: p1ELO.gained,
+                        newElo: p1ELO.newTotal,
+                        timeTaken: room.p1.timeTaken,
+                        matchId: p1MatchId || null,
+                        profile: prof || null
+                    });
+                            try {
+                                notificationService.createNotification({
+                                    recipientId: room.p1.id,
+                                    type: p1Win ? 'BATTLE_VICTORY' : 'BATTLE_DEFEAT',
+                                    title: p1Win ? 'You won a battle!' : 'You lost a battle',
+                                    message: p1Win ? `You won against ${room.p2.name}` : `You lost against ${room.p2.name}`,
+                                    actorId: room.p1.id,
+                                    entityType: 'match',
+                                    entityId: p1MatchId || null,
+                                    payload: { score: room.p1.score }
+                                }, (nErr, nid) => {
+                                    if (!nErr && nid) io.to(room.p1.socketId).emit('notification:new', { id: nid, type: p1Win ? 'BATTLE_VICTORY' : 'BATTLE_DEFEAT', title: p1Win ? 'You won a battle!' : 'You lost a battle', message: p1Win ? `You won against ${room.p2.name}` : `You lost against ${room.p2.name}` });
+                                });
+                            } catch (e) { }
+                });
             });
         });
 
@@ -443,14 +571,34 @@ function initSockets(io) {
             durationSeconds: Math.floor(room.p2.timeTaken || 0),
             details: p2Details
         }, (err, p2MatchId) => {
-            io.to(room.p2.socketId).emit('matchFinished', {
-                isWin: p2Win,
-                score: room.p2.score,
-                oppScore: room.p1.score,
-                eloChange: p2ELO.gained,
-                newElo: p2ELO.newTotal,
-                timeTaken: room.p2.timeTaken,
-                matchId: p2MatchId || null
+            const matchRow2 = { isWin: p2Win, details: p2Details, subject: room.subject, mode: room.mode };
+            achievementService.evaluateForMatch(room.p2.id, matchRow2, () => {
+                userModel.getUserProfile(room.p2.id, (getErr, prof) => {
+                    io.to(room.p2.socketId).emit('matchFinished', {
+                        isWin: p2Win,
+                        score: room.p2.score,
+                        oppScore: room.p1.score,
+                        eloChange: p2ELO.gained,
+                        newElo: p2ELO.newTotal,
+                        timeTaken: room.p2.timeTaken,
+                        matchId: p2MatchId || null,
+                        profile: prof || null
+                    });
+                            try {
+                                notificationService.createNotification({
+                                    recipientId: room.p2.id,
+                                    type: p2Win ? 'BATTLE_VICTORY' : 'BATTLE_DEFEAT',
+                                    title: p2Win ? 'You won a battle!' : 'You lost a battle',
+                                    message: p2Win ? `You won against ${room.p1.name}` : `You lost against ${room.p1.name}`,
+                                    actorId: room.p2.id,
+                                    entityType: 'match',
+                                    entityId: p2MatchId || null,
+                                    payload: { score: room.p2.score }
+                                }, (nErr, nid) => {
+                                    if (!nErr && nid) io.to(room.p2.socketId).emit('notification:new', { id: nid, type: p2Win ? 'BATTLE_VICTORY' : 'BATTLE_DEFEAT', title: p2Win ? 'You won a battle!' : 'You lost a battle', message: p2Win ? `You won against ${room.p1.name}` : `You lost against ${room.p1.name}` });
+                                });
+                            } catch (e) { }
+                });
             });
         });
 
