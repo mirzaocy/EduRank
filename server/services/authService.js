@@ -124,7 +124,22 @@ function loginUser(body) {
     });
 }
 
+function logoutUser(user) {
+    if (!user || !user.id) {
+        return Promise.resolve({ status: 200, data: { success: true, message: "Logout berhasil" } });
+    }
+
+    return Promise.resolve({
+        status: 200,
+        data: {
+            success: true,
+            message: "Logout berhasil"
+        }
+    });
+}
+
 module.exports = {
     registerUser,
-    loginUser
+    loginUser,
+    logoutUser
 };

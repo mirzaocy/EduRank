@@ -22,6 +22,41 @@ function getApiUrl(path) {
     return base ? `${base}${normalizedPath}` : normalizedPath;
 }
 
+function clearAuthState() {
+    if (window.EduRankStorage && typeof window.EduRankStorage.clearAuth === 'function') {
+        window.EduRankStorage.clearAuth();
+        return;
+    }
+
+    [
+        "edurank_token", "token", "edurank_user", "user", "edurankLoggedIn",
+        "name", "username", "email", "birthDate", "authProvider",
+        "studentPhotoVerified", "studentCardVerified", "province", "city",
+        "school", "class_level", "bio", "country", "rank", "avatar", "exp",
+        "matches", "wins", "elo_matematika", "elo_fisika", "elo_bahasainggris",
+        "elo_informatika", "highest_matematika", "highest_fisika",
+        "highest_bahasainggris", "highest_informatika", "learningStyle",
+        "learningStyleLabel", "learningStyleScores", "studentPhotoData",
+        "studentCardPhotoData"
+    ].forEach((key) => {
+        try { localStorage.removeItem(key); } catch (e) {}
+    });
+}
+
+function goToLoginPage(message) {
+    if (message) {
+        try {
+            sessionStorage.setItem("edurank_post_logout_message", message);
+        } catch (e) {}
+    }
+    window.location.replace("/");
+}
+
+async function handleUnauthorizedAccess(message) {
+    clearAuthState();
+    goToLoginPage(message || "Session kamu telah berakhir. Silakan login kembali.");
+}
+
 // ======================
 // PINDAH HALAMAN
 // ======================
@@ -2549,6 +2584,14 @@ async function initAuthGate(){
     const authGate = document.getElementById("authGate");
     if(!authGate) return;
 
+    try {
+        const sessionMessage = sessionStorage.getItem("edurank_post_logout_message");
+        if (sessionMessage) {
+            sessionStorage.removeItem("edurank_post_logout_message");
+            setTimeout(() => showCustomAlert(sessionMessage, "info"), 120);
+        }
+    } catch (e) {}
+
     const learningQuiz = document.getElementById("learningQuiz");
     const params = new URLSearchParams(window.location.search);
     const shouldOpenMain = params.get("view") === "main";
@@ -3129,8 +3172,7 @@ async function syncProfileWithServer() {
         }
 
         if (res.status === 401) {
-            localStorage.removeItem("edurank_token");
-            localStorage.removeItem("edurankLoggedIn");
+            await handleUnauthorizedAccess("Session kamu telah berakhir. Silakan login kembali.");
         }
 
         return res;

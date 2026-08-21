@@ -26,7 +26,21 @@ async function handleLogin(req, res) {
     }
 }
 
+async function handleLogout(req, res) {
+    try {
+        const result = await authService.logoutUser(req.user);
+        if (result.error) {
+            return res.status(result.status).json({ error: result.error });
+        }
+        res.status(result.status).json(result.data);
+    } catch (err) {
+        console.error("Logout error:", err);
+        res.status(500).json({ error: "Server error during logout." });
+    }
+}
+
 module.exports = {
     handleRegister,
-    handleLogin
+    handleLogin,
+    handleLogout
 };

@@ -110,9 +110,14 @@
               </div>
             </div>
           </div>
-          <button class="primary-btn" type="button" onclick="openEditProfileModal()">
-            <i class="fa-solid fa-pen-to-square"></i> Edit Profile
-          </button>
+          <div style="display:flex; gap:12px; flex-wrap:wrap; justify-content:flex-end;">
+            <button class="secondary-btn" type="button" onclick="openEditProfileModal()">
+              <i class="fa-solid fa-pen-to-square"></i> Edit Profile
+            </button>
+            <button class="primary-btn" type="button" onclick="openLogoutModal()">
+              <i class="fa-solid fa-right-from-bracket"></i> Logout
+            </button>
+          </div>
         </div>
 
         <div class="profile-grid">
@@ -214,20 +219,50 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="logoutOverlay">
+    <div class="game-modal" style="max-width: 460px;">
+      <div class="modal-header">
+        <h3>Konfirmasi Logout</h3>
+        <button class="modal-close" type="button" onclick="closeLogoutModal()"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <p style="color: var(--text-light); line-height: 1.6; margin: 0 0 20px;">
+        Apakah kamu yakin ingin keluar dari akun?
+      </p>
+      <div style="display:flex; gap:12px; justify-content:flex-end; flex-wrap:wrap;">
+        <button class="secondary-btn" type="button" onclick="closeLogoutModal()">Batal</button>
+        <button class="primary-btn" type="button" id="confirmLogoutBtn" onclick="handleLogout()">
+          Logout
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script src="/js/config/api-config.js"></script>
+  <script src="/js/utils/storage.js"></script>
   <script src="/js/components/interaksi.js"></script>
   <script>
     async function fetchProfileData() {
       const token = localStorage.getItem("edurank_token");
-      if(!token) return null;
+      if(!token) {
+        clearAuthState();
+        window.location.replace("/");
+        return null;
+      }
       try {
         const res = await fetch(getApiUrl('/api/profile'), {
           headers: { "Authorization": "Bearer " + token }
         });
+        if (res.status === 401 || res.status === 403) {
+          await handleUnauthorizedAccess("Session kamu telah berakhir. Silakan login kembali.");
+          return null;
+        }
         if(!res.ok) throw new Error("API failed");
         return await res.json();
       } catch(e) {
         console.error(e);
+        if (String(e && e.message || "").includes("API failed")) {
+          showCustomAlert("Gagal terhubung ke server. Coba lagi.", "error");
+        }
         return null;
       }
     }
@@ -243,6 +278,7 @@
     async function renderProfile() {
       const data = await fetchProfileData();
       if (!data) {
+          if (!localStorage.getItem("edurank_token")) return;
           const fallback = {
               name: localStorage.getItem('name') || 'Guest User',
               username: localStorage.getItem('username') || '-',
@@ -362,6 +398,75 @@
       document.getElementById("editProfileOverlay").classList.remove("show");
     }
 
+    function openLogoutModal() {
+      document.getElementById("logoutOverlay").classList.add("show");
+    }
+
+    function closeLogoutModal() {
+      document.getElementById("logoutOverlay").classList.remove("show");
+    }
+
+    async function handleLogout() {
+      const button = document.getElementById("confirmLogoutBtn");
+      if (!button || button.dataset.loading === "true") return;
+
+      const token = localStorage.getItem("edurank_token");
+      button.dataset.loading = "true";
+      const originalLabel = button.innerHTML;
+      button.disabled = true;
+      button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Keluar...';
+
+      try {
+        if (token) {
+          const res = await fetch(getApiUrl('/api/logout'), {
+            method: "POST",
+            headers: { "Authorization": "Bearer " + token }
+          });
+
+          if (res.status === 401 || res.status === 403) {
+            // Token sudah tidak valid; tetap lanjut bersihkan state lokal.
+          } else if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            showCustomAlert(data.error || "Gagal terhubung ke server. Coba lagi.", "error");
+            return;
+          }
+        }
+
+        if (window.EduRankStorage && typeof window.EduRankStorage.clearAuth === "function") {
+          window.EduRankStorage.clearAuth();
+        } else {
+          clearAuthState();
+        }
+
+        try {
+          if (window.socket && typeof window.socket.disconnect === "function") {
+            window.socket.disconnect();
+          }
+        } catch (socketError) {
+          console.warn("Socket disconnect skipped:", socketError);
+        }
+
+        closeLogoutModal();
+        window.location.replace("/");
+      } catch (error) {
+        if (token) {
+          if (window.EduRankStorage && typeof window.EduRankStorage.clearAuth === "function") {
+            window.EduRankStorage.clearAuth();
+          } else {
+            clearAuthState();
+          }
+          closeLogoutModal();
+          window.location.replace("/");
+          return;
+        }
+        showCustomAlert("Gagal terhubung ke server. Coba lagi.", "error");
+      } finally {
+        button.dataset.loading = "false";
+        button.disabled = false;
+        button.innerHTML = originalLabel;
+      }
+    }
+
     document.addEventListener("DOMContentLoaded", () => {
       renderProfile();
       // Auto-refresh profile every 30 seconds to reflect developer changes from CSV/admin
@@ -401,6 +506,8 @@
             closeEditProfileModal();
             renderProfile();
             showCustomAlert("Profile berhasil diperbarui.", "success");
+          } else if (res.status === 401 || res.status === 403) {
+            await handleUnauthorizedAccess("Session kamu telah berakhir. Silakan login kembali.");
           } else {
             const data = await res.json();
             showCustomAlert(data.error || "Gagal update profile", "error");

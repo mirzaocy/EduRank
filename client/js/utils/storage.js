@@ -55,6 +55,38 @@
         clearAuth() {
             this.removeToken();
             this.removeUser();
+            safeRemove('edurankLoggedIn');
+            safeRemove('name');
+            safeRemove('username');
+            safeRemove('email');
+            safeRemove('birthDate');
+            safeRemove('authProvider');
+            safeRemove('studentPhotoVerified');
+            safeRemove('studentCardVerified');
+            safeRemove('province');
+            safeRemove('city');
+            safeRemove('school');
+            safeRemove('class_level');
+            safeRemove('bio');
+            safeRemove('country');
+            safeRemove('rank');
+            safeRemove('avatar');
+            safeRemove('exp');
+            safeRemove('matches');
+            safeRemove('wins');
+            safeRemove('elo_matematika');
+            safeRemove('elo_fisika');
+            safeRemove('elo_bahasainggris');
+            safeRemove('elo_informatika');
+            safeRemove('highest_matematika');
+            safeRemove('highest_fisika');
+            safeRemove('highest_bahasainggris');
+            safeRemove('highest_informatika');
+            safeRemove('learningStyle');
+            safeRemove('learningStyleLabel');
+            safeRemove('learningStyleScores');
+            safeRemove('studentPhotoData');
+            safeRemove('studentCardPhotoData');
         }
     };
 
