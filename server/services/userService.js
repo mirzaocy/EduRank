@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const userModel = require('../models/userModel');
 const presenceService = require('./presenceService');
+const db = require('../config');
 const { getJwtSecret } = require('../config/serverConfig');
 
 function getProfile(userId) {
@@ -238,6 +239,170 @@ function adminDeleteUser(idParam) {
     });
 }
 
+function getAdminStats() {
+    return new Promise((resolve) => {
+        const stats = {};
+        db.get(`SELECT COUNT(*) AS totalUsers, SUM(CASE WHEN role = 'admin' THEN 1 ELSE 0 END) AS admins, SUM(CASE WHEN role = 'developer' THEN 1 ELSE 0 END) AS developers, SUM(CASE WHEN banned = 1 THEN 1 ELSE 0 END) AS bannedUsers, SUM(CASE WHEN status = 'Online' THEN 1 ELSE 0 END) AS onlineUsers, SUM(exp) AS totalExp, SUM(matches) AS totalBattles, SUM(wins) AS totalWins FROM users`, [], (err, userRow) => {
+            if (err) return resolve({ status: 500, error: 'Database error' });
+            db.get(`SELECT COUNT(*) AS totalFeedback FROM feedback`, [], (fErr, feedbackRow) => {
+                if (fErr) return resolve({ status: 500, error: 'Database error' });
+                db.get(`SELECT COUNT(*) AS unreadNotifications FROM notifications WHERE is_read = 0`, [], (nErr, notifRow) => {
+                    if (nErr) return resolve({ status: 500, error: 'Database error' });
+                    db.get(`SELECT COUNT(*) AS activeMatches FROM match_history WHERE created_at >= datetime('now', '-1 day')`, [], (mErr, matchRow) => {
+                        if (mErr) return resolve({ status: 500, error: 'Database error' });
+                        resolve({
+                            status: 200,
+                            data: {
+                                totalUsers: userRow?.totalUsers || 0,
+                                admins: userRow?.admins || 0,
+                                developers: userRow?.developers || 0,
+                                bannedUsers: userRow?.bannedUsers || 0,
+                                onlineUsers: userRow?.onlineUsers || 0,
+                                totalExp: userRow?.totalExp || 0,
+                                totalBattles: userRow?.totalBattles || 0,
+                                totalWins: userRow?.totalWins || 0,
+                                totalFeedback: feedbackRow?.totalFeedback || 0,
+                                unreadNotifications: notifRow?.unreadNotifications || 0,
+                                activeMatches: matchRow?.activeMatches || 0
+                            }
+                        });
+                    });
+                });
+            });
+        });
+    });
+}
+
+function searchAdminUsers(query = {}) {
+    const term = String(query.q || '').trim();
+    const role = String(query.role || 'all').trim().toLowerCase();
+    const status = String(query.status || 'all').trim().toLowerCase();
+    const limit = Math.min(Math.max(Number(query.limit) || 20, 1), 100);
+    const offset = Math.max(Number(query.offset) || 0, 0);
+    const params = [];
+    let sql = `SELECT id, username, email, nama AS name, role, banned, status, last_login, created_at, updated_at, exp, matches, wins, province, city, school, class_level, avatar, rank_points FROM users WHERE 1=1`;
+
+    if (term) {
+        sql += ` AND (username LIKE ? OR email LIKE ? OR nama LIKE ? OR CAST(id AS TEXT) LIKE ?)`;
+        const like = `%${term}%`;
+        params.push(like, like, like, like);
+    }
+    if (role !== 'all') {
+        sql += ` AND role = ?`;
+        params.push(role);
+    }
+    if (status !== 'all') {
+        if (status === 'online') sql += ` AND status = 'Online'`;
+        else if (status === 'offline') sql += ` AND status != 'Online'`;
+        else if (status === 'banned') sql += ` AND banned = 1`;
+    }
+
+    sql += ` ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+    params.push(limit, offset);
+
+    return new Promise((resolve) => {
+        db.all(sql, params, (err, rows) => {
+            if (err) return resolve({ status: 500, error: 'Database error' });
+            db.get(`SELECT COUNT(*) AS total FROM users WHERE 1=1`, [], (countErr, countRow) => {
+                if (countErr) return resolve({ status: 500, error: 'Database error' });
+                resolve({ status: 200, data: { items: rows || [], total: countRow?.total || 0 } });
+            });
+        });
+    });
+}
+
+function getAdminUserById(idParam) {
+    const id = Number(idParam);
+    if (!Number.isInteger(id) || id <= 0) return Promise.resolve({ status: 400, error: 'Invalid user id.' });
+    return new Promise((resolve) => {
+        userModel.findUserById(id, (err, user) => {
+            if (err) return resolve({ status: 500, error: 'Database error' });
+            if (!user) return resolve({ status: 404, error: 'User not found' });
+            const safe = { ...user };
+            delete safe.password;
+            resolve({ status: 200, data: safe });
+        });
+    });
+}
+
+function adminUpdateUserRole(idParam, body = {}, actor = {}) {
+    const id = Number(idParam);
+    const role = String(body.role || '').toLowerCase();
+    if (!Number.isInteger(id) || id <= 0) return Promise.resolve({ status: 400, error: 'Invalid user id.' });
+    if (!['siswa', 'admin', 'developer'].includes(role)) return Promise.resolve({ status: 400, error: 'Invalid role.' });
+    if (role === 'developer' && actor.role !== 'developer') {
+        return Promise.resolve({ status: 403, error: 'Only developer can assign developer role.' });
+    }
+    if (actor.role === 'admin' && role === 'developer') {
+        return Promise.resolve({ status: 403, error: 'Admin cannot assign developer role.' });
+    }
+    return new Promise((resolve) => {
+        db.run(`UPDATE users SET role = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [role, id], function (err) {
+            if (err) return resolve({ status: 500, error: 'Database error' });
+            if (!this.changes) return resolve({ status: 404, error: 'User not found' });
+            resolve({ status: 200, data: { message: 'Role updated', role } });
+        });
+    });
+}
+
+function getAdminBattles(query = {}) {
+    const limit = Math.min(Math.max(Number(query.limit) || 20, 1), 100);
+    const offset = Math.max(Number(query.offset) || 0, 0);
+    const subject = String(query.subject || '').trim().toLowerCase();
+    const mode = String(query.mode || '').trim().toLowerCase();
+    const params = [];
+    let sql = `SELECT mh.id, mh.user_id, u.username AS player_username, u.nama AS player_name, mh.opponent_name, mh.subject, mh.mode, mh.is_win, mh.elo_change, mh.duration_seconds, mh.created_at FROM match_history mh LEFT JOIN users u ON u.id = mh.user_id WHERE 1=1`;
+    if (subject) { sql += ` AND mh.subject = ?`; params.push(subject); }
+    if (mode) { sql += ` AND mh.mode = ?`; params.push(mode); }
+    sql += ` ORDER BY mh.created_at DESC, mh.id DESC LIMIT ? OFFSET ?`;
+    params.push(limit, offset);
+    return new Promise((resolve) => {
+        db.all(sql, params, (err, rows) => {
+            if (err) return resolve({ status: 500, error: 'Database error' });
+            resolve({ status: 200, data: { items: rows || [] } });
+        });
+    });
+}
+
+function getAdminFeedback(query = {}) {
+    const limit = Math.min(Math.max(Number(query.limit) || 20, 1), 100);
+    const offset = Math.max(Number(query.offset) || 0, 0);
+    return new Promise((resolve) => {
+        db.all(`SELECT id, name, email, message, created_at FROM feedback ORDER BY created_at DESC LIMIT ? OFFSET ?`, [limit, offset], (err, rows) => {
+            if (err) return resolve({ status: 500, error: 'Database error' });
+            resolve({ status: 200, data: { items: rows || [] } });
+        });
+    });
+}
+
+function getAdminNotifications(query = {}) {
+    const limit = Math.min(Math.max(Number(query.limit) || 20, 1), 100);
+    const offset = Math.max(Number(query.offset) || 0, 0);
+    return new Promise((resolve) => {
+        db.all(`SELECT id, recipient_id, type, title, message, actor_id, entity_type, entity_id, is_read, created_at FROM notifications ORDER BY created_at DESC LIMIT ? OFFSET ?`, [limit, offset], (err, rows) => {
+            if (err) return resolve({ status: 500, error: 'Database error' });
+            resolve({ status: 200, data: { items: rows || [] } });
+        });
+    });
+}
+
+function getAdminSystemStatus() {
+    return new Promise((resolve) => {
+        db.ping((err) => {
+            resolve({
+                status: 200,
+                data: {
+                    api: 'Online',
+                    database: err ? 'Disconnected' : 'Connected',
+                    realtime: 'Available',
+                    environment: process.env.NODE_ENV || 'development',
+                    nodeVersion: process.version
+                }
+            });
+        });
+    });
+}
+
 module.exports = {
     getProfile,
     updateProfile,
@@ -250,5 +415,13 @@ module.exports = {
     getAllUsers,
     adminUpdateUser,
     adminBanUser,
-    adminDeleteUser
+    adminDeleteUser,
+    getAdminStats,
+    searchAdminUsers,
+    getAdminUserById,
+    adminUpdateUserRole,
+    getAdminBattles,
+    getAdminFeedback,
+    getAdminNotifications,
+    getAdminSystemStatus
 };

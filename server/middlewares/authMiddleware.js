@@ -26,7 +26,7 @@ const authenticateToken = (req, res, next) => {
 
 const requireAdmin = (req, res, next) => {
     authenticateToken(req, res, () => {
-        if (req.user.role === 'admin') {
+        if (req.user.role === 'admin' || req.user.role === 'developer') {
             return next();
         }
 
@@ -42,7 +42,15 @@ const requireAdmin = (req, res, next) => {
     });
 };
 
+const requireDeveloper = (req, res, next) => {
+    authenticateToken(req, res, () => {
+        if (req.user.role === 'developer') return next();
+        return res.sendStatus(403);
+    });
+};
+
 module.exports = {
     authenticateToken,
-    requireAdmin
+    requireAdmin,
+    requireDeveloper
 };

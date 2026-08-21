@@ -93,6 +93,10 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(clientRoot, 'pages', 'index.html'));
 });
 
+app.get(['/admin', '/admin/*'], authenticateToken, requireAdmin, (req, res) => {
+    res.sendFile(path.join(clientRoot, 'pages', 'admin.html'));
+});
+
 // Mount routes
 app.use(router);
 
